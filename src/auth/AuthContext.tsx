@@ -1,0 +1,126 @@
+// src/auth/AuthContext.tsx
+import { createContext, useContext, useMemo, useState } from "react";
+import { login } from "../api/auth";
+import type { LoginRequest } from "../types/dto";
+
+type Ctx = {
+  isAuth: boolean;
+  userId?: number;
+  role?: string;
+  organizationId?: number;
+  providerId?: number;
+  signIn: (body: LoginRequest) => Promise<void>;
+  signOut: () => void;
+};
+
+const AuthContext = createContext<Ctx>({} as Ctx);
+export const useAuth = () => useContext(AuthContext);
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [isAuth, setAuth] = useState(!!localStorage.getItem("jwtToken"));
+  const [userId, setUserId] = useState<number | undefined>(
+    localStorage.getItem("userId") ? Number(localStorage.getItem("userId")) : undefined
+  );
+  const [role, setRole] = useState<string | undefined>(localStorage.getItem("role") || undefined);
+  const [organizationId, setOrganizationId] = useState<number | undefined>(
+    localStorage.getItem("organizationId")
+      ? Number(localStorage.getItem("organizationId"))
+      : undefined
+  );
+  const [providerId, setProviderId] = useState<number | undefined>(
+    localStorage.getItem("providerId")
+      ? Number(localStorage.getItem("providerId"))
+      : undefined
+  );
+
+  /**
+   * Inicia sesión y guarda el contexto de autenticación
+   */
+  const signIn = async (body: LoginRequest) => {
+    const res = await login(body);
+
+    if (res?.token) {
+      // 🧩 Guardar en localStorage (string siempre)
+      localStorage.setItem("jwtToken", res.token);
+      if (res.userId) localStorage.setItem("userId", String(res.userId));
+      if (res.role) localStorage.setItem("role", res.role);
+      if (res.organizationId)
+        localStorage.setItem("organizationId", String(res.organizationId));
+      if (res.providerId) localStorage.setItem("providerId", String(res.providerId));
+
+      // 🧠 Actualizar estados locales
+      setAuth(true);
+      setUserId(res.userId);
+      setRole(res.role);
+      setOrganizationId(res.organizationId);
+      setProviderId(res.providerId);
+
+      // 🚀 Redirigir según el rol
+      redirectAfterLogin(res.role, res.organizationId, res.providerId);
+    } else {
+      throw new Error("No se recibió token válido del backend");
+    }
+  };
+
+  /**
+   * Determina la redirección según el rol y datos disponibles
+   */
+  const redirectAfterLogin = (
+  role?: string,
+  orgId?: number | null,
+  provId?: number | null
+    ) => {
+      if (role === "ADMIN") {
+        // 🔹 Los administradores siempre comienzan en la selección de organizaciones
+        window.location.href = "/dashboard-orgs";
+        return;
+      }
+
+      if (role === "MANAGER") {
+        // Si el manager no tiene proveedor, va a seleccionar uno
+        if (!provId) {
+          window.location.href = "/dashboard-providers";
+        } else {
+          window.location.href = "/";
+        }
+        return;
+      }
+
+      if (role === "PROVIDER") {
+        // Provider directo al dashboard principal
+        window.location.href = "/";
+        return;
+      }
+
+      // Fallback genérico
+      window.location.href = "/";
+    };
+
+  /**
+   * Limpia sesión y vuelve al login
+   */
+  const signOut = () => {
+    localStorage.clear();
+    setAuth(false);
+    setUserId(undefined);
+    setRole(undefined);
+    setOrganizationId(undefined);
+    setProviderId(undefined);
+    window.location.href = "/login";
+  };
+
+  const value = useMemo(
+    () => ({
+      isAuth,
+      userId,
+      role,
+      organizationId,
+      providerId,
+      signIn,
+      signOut,
+    }),
+    [isAuth, userId, role, organizationId, providerId]
+  );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
