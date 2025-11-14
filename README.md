@@ -1,45 +1,126 @@
+# 🚀 WATurnos BACK OFFICE WEB (React + TypeScript + Material UI)
 
-# WATurnos Web (React + Material UI)
+Front-end oficial del ecosistema de back office **WATurnos**, integrado con los servicios de autenticación, clientes, proveedores, organizaciones y turnos.  
+Implementado con **React + Vite**, **Material UI**, **React Router**, **Axios con JWT**, y soporte para mapa interactivo con **Leaflet**.
 
-Front-end base alineado con los controladores actuales de *Clients* y *Bookings*,
-usando Material UI y axios con JWT.
+---
 
-## Requisitos
-- Node 18+
-- pnpm (recomendado) o npm/yarn
+# 📦 Requisitos
 
-## Instalación
+- **Node.js 18+**
+- **pnpm** (recomendado)
+
+---
+
+# 🛠️ Instalación y ejecución
+
 ```bash
 pnpm install
 cp .env.example .env
-# editar .env si hace falta
 pnpm dev
 ```
 
-Abrí http://localhost:5173
+Abrir: http://localhost:5173
 
-## Estructura
-- `src/api`: Módulos axios: auth, clients, bookings.
-- `src/auth`: Contexto de auth (JWT) + ruta protegida.
-- `src/components`: UI reutilizable (AppBar, diálogos).
-- `src/pages`: Login, Dashboard, Clients, Bookings.
-- `src/types`: DTOs y enums mínimos para compilar.
-- `src/theme`: Tema Material UI base (colores WATurnos).
+---
 
-## Rutas
-- `/login`
-- `/` (Dashboard)
-- `/clients`
-- `/bookings`
+# 📂 Estructura del proyecto
 
-## JWT
-- El token devuelto por `POST /auth/login` se guarda en `localStorage.jwtToken`.
-- El interceptor axios adjunta `Authorization: Bearer <token>`.
+```
+├── index.html
+├── package.json
+├── vite.config.ts
+├── tsconfig*.json
+├── public/
+│   └── vite.svg
+└── src/
+    ├── main.tsx           # Punto de entrada Vite
+    ├── App.tsx            # Router principal
+    ├── api/               # Axios + módulos de API
+    ├── auth/              # JWT, AuthContext, ProtectedRoute
+    ├── components/        # UI reutilizable
+    ├── layout/            # Layout global
+    ├── pages/             # Vistas principales
+    ├── types/             # DTOs y definiciones TS
+    ├── utils/             # Helpers generales
+    ├── theme/             # Material UI Theme
+    └── config/            # Helpers o constantes
+```
 
-## Notas
-- Selector de servicio en BookingsPage está "mockeado" con `value=1` y un MenuItem.
-  Conectar a tus endpoints reales de servicios para poblarlo.
-- El diálogo de *Asignar turno* crea `BookingDTO` y lo envía a `POST /bookings` (lista).
-- Cancelar turno usa `POST /bookings/cancel` con `{ id, reason }`.
+---
 
-¡Listo para iterar! 
+# 🔐 Autenticación JWT
+
+- Login → `POST /auth/login`
+- Token se guarda en:
+  ```
+  localStorage.jwtToken
+  ```
+- Axios agrega automáticamente:
+  ```
+  Authorization: Bearer <token>
+  ```
+
+---
+
+# 🧭 Rutas principales
+
+| Ruta | Descripción |
+|------|-------------|
+| `/login` | Inicio de sesión |
+| `/` | Dashboard general |
+| `/clients` | Gestión de clientes |
+| `/bookings` | Turnos |
+| `/dashboard-organizations` | Organizaciones |
+| `/dashboard-providers` | Proveedores |
+
+
+---
+
+# 🌍 Mapa (Leaflet)
+
+En creación de organización:
+
+- Click en el mapa mueve el pin  
+- Pin draggable  
+- Coordenadas actualizadas en el formulario  
+
+---
+
+# 🧪 Scripts
+
+```
+pnpm dev
+pnpm build
+pnpm preview
+pnpm lint
+```
+
+---
+
+# 🗂️ .gitignore
+
+Incluye node_modules, dist, logs, env, VSCode, .DS_Store, etc.
+
+---
+
+# 👥 Contribución
+
+1. `git checkout -b feature/nombre`
+2. `git commit -m "Mensaje"`
+3. `git push origin feature/nombre`
+4. Crear Pull Request
+
+---
+
+# 🧩 Roadmap
+
+- Dashboard proveedor mejorado  
+- Agenda día/semana  
+- Agenda pública  
+- Notificaciones  
+- Pasarela de pagos  
+
+---
+
+🔥 **Listo para usar e iterar.** 🔥
