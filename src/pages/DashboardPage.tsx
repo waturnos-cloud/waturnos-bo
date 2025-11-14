@@ -3,6 +3,11 @@ import { DataGrid } from "@mui/x-data-grid";
 import { authFetch } from "../api/http";
 import { useAuth } from "../auth/AuthContext";
 import DayOccupancyCard from "../components/DayOccupancyCard";
+import { Autocomplete } from "@mui/material";
+import CloseIcon from "@mui/icons-material/Close";
+import PersonIcon from "@mui/icons-material/Person";
+import PhoneIcon from "@mui/icons-material/Phone";
+import EmailIcon from "@mui/icons-material/Email";
 
 import {
   Grid,
@@ -14,9 +19,17 @@ import {
   Button,
   CircularProgress,
   Fade,
+  InputAdornment,
   IconButton,
   Tooltip,
   Stack,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  Snackbar,
+  Alert
 } from "@mui/material";
 
 import AssignmentIndIcon from "@mui/icons-material/AssignmentInd";
@@ -27,73 +40,169 @@ import CancelIcon from "@mui/icons-material/Cancel";
 import EventAvailableIcon from "@mui/icons-material/EventAvailable";
 import DoNotDisturbIcon from "@mui/icons-material/DoNotDisturb";
 
+import { assignBooking } from "../api/bookings";
+
 export default function Dashboard() {
-
-
-  const [turnos, setTurnos] = useState([]);
-  const [loading, setLoading] = useState(true);
   const { providerId } = useAuth();
 
-  const orgName = localStorage.getItem("organizationName");
+  // -------------------------------------------------
+  // Estados principales
+  // -------------------------------------------------
+  const [turnos, setTurnos] = useState<any[]>([]);
+  const [clients, setClients] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Modal asignar turno
+  const [openAssignModal, setOpenAssignModal] = useState(false);
+  const [selectedBooking, setSelectedBooking] = useState<number | "">("");
+  const [selectedClient, setSelectedClient] = useState<number | "">("");
+  const [assignLoading, setAssignLoading] = useState(false);
+const [createClientOpen, setCreateClientOpen] = useState(false);
+const [newClient, setNewClient] = useState({
+  fullName: "",
+  phone: "",
+  email: "",
+});
+const [creatingClient, setCreatingClient] = useState(false);
+
+
+const [snackbar, setSnackbar] = useState({
+  open: false,
+  message: "",
+  severity: "success" as "success" | "error" | "warning",
+});
+
+const showToast = (
+  message: string,
+  severity: "success" | "error" | "warning"
+) => {
+  setSnackbar({ open: true, message, severity });
+};
+
+const handleCloseSnackbar = () =>
+  setSnackbar((prev) => ({ ...prev, open: false }));
+
+  // Datos guardados en localStorage
+  const organizationName = localStorage.getItem("organizationName");
   const providerName = localStorage.getItem("providerName");
 
+  // -------------------------------------------------
+  // Cargar datos principales
+  // -------------------------------------------------
   useEffect(() => {
-    if (!providerId) return;
-    loadData(providerId);
+    if (providerId) {
+      loadTurnos(providerId);
+      loadClients();
+    }
   }, [providerId]);
 
-  const loadData = async (provId: number) => {
+  const loadTurnos = async (provId: number) => {
     try {
       setLoading(true);
-
       const res = await authFetch(`/bookings/today?providerId=${provId}`);
       const json = await res.json();
-
       setTurnos(json.data ?? []);
-    } catch (e) {
-      console.error("Error cargando dashboard:", e);
+    } catch (err) {
+      console.error("Error cargando turnos:", err);
     } finally {
       setLoading(false);
     }
   };
 
-  // ----------------------------------------------------
-  // 🍬 MAPA VISUAL DE ESTADOS
-  // ----------------------------------------------------
-const estadoUI = {
-  PENDING: { label: "Libre", color: "#FFA000" },   // 👈 antes FREE
-  FREE: { label: "Libre", color: "#FFA000" },      // soportamos ambos por si después migrás
-  RESERVED: { label: "Reservado", color: "#2E7D32" },
-  CANCELLED: { label: "Cancelado", color: "#C62828" },
-  COMPLETED: { label: "Completado", color: "#1565C0" },
-  "NO-SHOW": { label: "No-Show", color: "#8e24aa" },
-};
+  const loadClients = async () => {
+    try {
+      const res = await authFetch("/clients");
+      const json = await res.json();
+      setClients(json.data ?? json);
+    } catch (err) {
+      console.error("Error cargando clientes:", err);
+    }
+  };
 
-  // ----------------------------------------------------
-  // 📌 Columnas nuevas con acciones
-  // ----------------------------------------------------
+  // -------------------------------------------------
+  // Asignar turno
+  // -------------------------------------------------
+  const handleConfirmAssign = async () => {
+    if (!selectedBooking || !selectedClient) {
+      alert("Seleccioná turno y cliente.");
+      return;
+    }
+
+    try {
+      setAssignLoading(true);
+
+      await assignBooking({
+        id: Number(selectedBooking),
+        clientId: Number(selectedClient),
+      });
+
+      showToast("El turno fue asignado correctamente.", "success");
+      setOpenAssignModal(false);
+      setSelectedBooking("");
+      setSelectedClient("");
+
+      if (providerId) loadTurnos(providerId);
+    } catch (err) {
+      console.error("Error asignando turno:", err);
+      alert("No se pudo asignar el turno.");
+    } finally {
+      setAssignLoading(false);
+    }
+  };
+
+  // -------------------------------------------------
+  // Cambiar organización
+  // -------------------------------------------------
+  const handleChangeOrganization = () => {
+    localStorage.removeItem("organizationId");
+    localStorage.removeItem("organizationName");
+    localStorage.removeItem("organizationLogo");
+    localStorage.removeItem("organizationType");
+    localStorage.removeItem("organizationCategory");
+    localStorage.removeItem("organizationSubcategory");
+    localStorage.removeItem("providerId");
+    localStorage.removeItem("providerName");
+
+    window.location.href = "/dashboard-orgs";
+  };
+
+  // -------------------------------------------------
+  // UI Estados
+  // -------------------------------------------------
+  const estadoUI: Record<string, { label: string; color: string }> = {
+    FREE: { label: "Libre", color: "#FFA000" },
+    PENDING: { label: "Libre", color: "#FFA000" },
+    RESERVED: { label: "Reservado", color: "#2E7D32" },
+    CANCELLED: { label: "Cancelado", color: "#C62828" },
+    COMPLETED: { label: "Completado", color: "#1565C0" },
+    "NO-SHOW": { label: "No-Show", color: "#8e24aa" },
+  };
+
+  // -------------------------------------------------
+  // Columnas tabla
+  // -------------------------------------------------
   const columns = [
-{
-  field: "startTime",
-  headerName: "Inicio",
-  width: 120,
-  renderCell: (params) => {
-    if (!params.value) return "-";
-    const date = new Date(params.value);
-    return date.toLocaleTimeString("es-AR", {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    });
-  },
-}, 
+    {
+      field: "startTime",
+      headerName: "Inicio",
+      width: 120,
+      renderCell: (params: any) => {
+        const date = new Date(params.value);
+        return date.toLocaleTimeString("es-AR", {
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false,
+        });
+      },
+    },
     { field: "clientName", headerName: "Cliente", width: 180 },
     { field: "serviceName", headerName: "Servicio", width: 160 },
+
     {
       field: "status",
       headerName: "Estado",
       width: 140,
-      renderCell: (params) => {
+      renderCell: (params: any) => {
         const st = estadoUI[params.value] ?? estadoUI["FREE"];
         return (
           <Chip
@@ -109,50 +218,41 @@ const estadoUI = {
       },
     },
 
-    // ------------------------------------------------
-    // 🟦 ACCIONES POR FILA
-    // ------------------------------------------------
     {
       field: "actions",
       headerName: "Acciones",
       width: 200,
       sortable: false,
-      renderCell: (params) => {
+      renderCell: (params: any) => {
         const turno = params.row;
 
         return (
-
           <Stack direction="row" spacing={1}>
-            {/* VER DETALLE */}
             <Tooltip title="Ver detalle">
-              <IconButton size="small" onClick={() => console.log("Detalle", turno)}>
+              <IconButton size="small">
                 <VisibilityIcon fontSize="small" />
               </IconButton>
             </Tooltip>
 
-            {/* EDITAR */}
-            <Tooltip title="Editar turno">
+            <Tooltip title="Editar">
               <IconButton size="small">
                 <EditIcon fontSize="small" />
               </IconButton>
             </Tooltip>
 
-            {/* CANCELAR */}
             <Tooltip title="Cancelar turno">
               <IconButton size="small">
                 <CancelIcon fontSize="small" sx={{ color: "#c62828" }} />
               </IconButton>
             </Tooltip>
 
-            {/* NO SHOW */}
-            <Tooltip title="Marcar No-Show">
+            <Tooltip title="No Show">
               <IconButton size="small">
                 <DoNotDisturbIcon fontSize="small" sx={{ color: "#8e24aa" }} />
               </IconButton>
             </Tooltip>
 
-            {/* COMPLETAR */}
-            <Tooltip title="Marcar completado">
+            <Tooltip title="Completado">
               <IconButton size="small">
                 <EventAvailableIcon fontSize="small" sx={{ color: "#1565C0" }} />
               </IconButton>
@@ -163,9 +263,20 @@ const estadoUI = {
     },
   ];
 
-  // --------------------------------------------------------
-  // ⏳ Loader elegante
-  // --------------------------------------------------------
+  // -------------------------------------------------
+  // KPIs
+  // -------------------------------------------------
+  const count = {
+    free: turnos.filter((t) => t.status === "FREE" || t.status === "PENDING").length,
+    reserved: turnos.filter((t) => t.status === "RESERVED").length,
+    cancelled: turnos.filter((t) => t.status === "CANCELLED").length,
+    completed: turnos.filter((t) => t.status === "COMPLETED").length,
+    noshow: turnos.filter((t) => t.status === "NO-SHOW").length,
+  };
+
+  // -------------------------------------------------
+  // LOADING
+  // -------------------------------------------------
   if (loading) {
     return (
       <Fade in={true}>
@@ -186,165 +297,72 @@ const estadoUI = {
     );
   }
 
-  // --------------------------------------------------------
-  // 📊 KPI DE CONTADORES DEL DÍA
-  // --------------------------------------------------------
-const count = {
-  free: turnos.filter((t) => t.status === "PENDING" || t.status === "FREE").length,
-  reserved: turnos.filter((t) => t.status === "RESERVED").length,
-  cancelled: turnos.filter((t) => t.status === "CANCELLED").length,
-  completed: turnos.filter((t) => t.status === "COMPLETED").length,
-  noshow: turnos.filter((t) => t.status === "NO-SHOW").length,
-};
-
-
-const handleChangeOrganization = () => {
-    // Limpiamos sólo lo relacionado a la org/proveedor
-    localStorage.removeItem("organizationId");
-    localStorage.removeItem("organizationName");
-    localStorage.removeItem("organizationLogo");
-    localStorage.removeItem("organizationType");
-    localStorage.removeItem("organizationCategory");
-    localStorage.removeItem("organizationSubcategory");
-    localStorage.removeItem("providerId");
-    localStorage.removeItem("providerName");
-
-    // Volvemos a la pantalla de selección de organizaciones
-    window.location.href = "/dashboard-orgs"; // 👈 asegurate que esta ruta exista en tu router
-  };
-
+  // -------------------------------------------------
+  // RENDER PRINCIPAL
+  // -------------------------------------------------
   return (
-  <Box sx={{ p: 4 }}>
-    {/* Información de organización y proveedor */}
-{/* 🔷 INFO DE ORGANIZACIÓN Y PROVEEDOR */}
-<Card
-  elevation={0}
-  sx={{
-    mb: 4,
-    p: 2.5,
-    borderRadius: 2,
-    border: "1px solid #e0e0e0",
-    bgcolor: "#fafafa",
-  }}
->
-  <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-    
-    {/* IZQUIERDA: logo + nombre */}
-    <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-      
-      {/* LOGO */}
-      {localStorage.getItem("organizationLogo") ? (
-        <Box
-          component="img"
-          src={localStorage.getItem("organizationLogo")!}
-          alt="logo"
-          sx={{
-            width: 56,
-            height: 56,
-            borderRadius: 2,
-            objectFit: "cover",
-            border: "1px solid #ddd",
-            backgroundColor: "#fff",
-          }}
-        />
-      ) : (
-        <Box
-          sx={{
-            width: 56,
-            height: 56,
-            borderRadius: 2,
-            backgroundColor: "#1976D2",
-            color: "#fff",
-            fontSize: 22,
-            fontWeight: 700,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            border: "1px solid #ddd",
-          }}
-        >
-          {(localStorage.getItem("organizationName") || "?")
-            .substring(0, 1)
-            .toUpperCase()}
+    <Box sx={{ p: 4 }}>
+
+      {/* INFO ORG / PROVEEDOR */}
+      <Card sx={{ mb: 4, p: 2.5, borderRadius: 2, border: "1px solid #e0e0e0", bgcolor: "#fafafa" }}>
+        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+
+          {/* Izquierda */}
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+            <Box
+              sx={{
+                width: 56,
+                height: 56,
+                backgroundColor: "#1976D2",
+                borderRadius: 2,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "#fff",
+                fontSize: 22,
+                fontWeight: 700,
+              }}
+            >
+              {organizationName?.substring(0, 1).toUpperCase()}
+            </Box>
+
+            <Box>
+              <Typography variant="h6" fontWeight={700}>
+                {organizationName}
+              </Typography>
+
+              {providerName && (
+                <Typography variant="body2" color="text.secondary">
+                  Proveedor: <strong>{providerName}</strong>
+                </Typography>
+              )}
+            </Box>
+          </Box>
+
+          {/* Derecha */}
+          <Button variant="outlined" size="small" onClick={handleChangeOrganization}>
+            Cambiar
+          </Button>
         </Box>
-      )}
+      </Card>
 
-      {/* TEXTOS */}
-      <Box>
-        <Typography variant="h6" fontWeight={700} sx={{ mb: 0.2 }}>
-          {localStorage.getItem("organizationName") || "Organización no seleccionada"}
-        </Typography>
-
-        {localStorage.getItem("providerName") && (
-          <Typography variant="body2" color="text.secondary">
-            Proveedor: <strong>{localStorage.getItem("providerName")}</strong>
-          </Typography>
-        )}
-      </Box>
-    </Box>
-
-    {/* DERECHA: chips */}
-    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-
-      {/* CHIP SIMPLE/MULTI */}
-      <Chip
-        label={
-          localStorage.getItem("organizationType") === "simple" ? "Simple" : "Multi"
-        }
-        color={
-          localStorage.getItem("organizationType") === "simple" ? "success" : "primary"
-        }
-        variant="outlined"
-        sx={{ fontWeight: 600 }}
-      />
-
-      {/* CHIP CATEGORÍA */}
-      {localStorage.getItem("organizationCategory") && (
-        <Chip
-          icon={<span style={{ fontSize: 16 }}>📁</span>}
-          label={localStorage.getItem("organizationCategory")}
-          sx={{ bgcolor: "#E3F2FD", fontWeight: 600 }}
-        />
-      )}
-
-      {/* CHIP SUBCATEGORÍA */}
-      {localStorage.getItem("organizationSubcategory") && (
-        <Chip
-          icon={<span style={{ fontSize: 16 }}>🏷️</span>}
-          label={localStorage.getItem("organizationSubcategory")}
-          sx={{ bgcolor: "#FFF3E0", fontWeight: 600 }}
-        />
-      )}
-
-      {/* BOTÓN CAMBIAR */}
-      <Button
-        size="small"
-        variant="outlined"
-        onClick={handleChangeOrganization}
-      >
-        Cambiar
-      </Button>
-    </Box>
-
-  </Box>
-</Card>
-
-      {/* 🔷 KPIs superiores */}
+      {/* KPIs */}
       <Grid container spacing={3}>
         <Grid item xs={12} md={8}>
           <Card sx={{ borderRadius: 2, p: 2 }}>
             <Typography variant="h6">Turnos de Hoy</Typography>
+
             <Stack direction="row" spacing={2} mt={2}>
-              <Chip label={`Libres: ${count.free}`} sx={{ bgcolor: "#FFF3CD", color: "#856404" }} />
-              <Chip label={`Reservados: ${count.reserved}`} sx={{ bgcolor: "#E8F5E9", color: "#2E7D32" }} />
-              <Chip label={`Cancelados: ${count.cancelled}`} sx={{ bgcolor: "#FFEBEE", color: "#C62828" }} />
-              <Chip label={`Completados: ${count.completed}`} sx={{ bgcolor: "#E3F2FD", color: "#1565C0" }} />
-              <Chip label={`No-Show: ${count.noshow}`} sx={{ bgcolor: "#F3E5F5", color: "#8e24aa" }} />
+              <Chip label={`Libres: ${count.free}`} sx={{ bgcolor: "#FFF3CD" }} />
+              <Chip label={`Reservados: ${count.reserved}`} sx={{ bgcolor: "#E8F5E9" }} />
+              <Chip label={`Cancelados: ${count.cancelled}`} sx={{ bgcolor: "#FFEBEE" }} />
+              <Chip label={`Completados: ${count.completed}`} sx={{ bgcolor: "#E3F2FD" }} />
+              <Chip label={`No-Show: ${count.noshow}`} sx={{ bgcolor: "#F3E5F5" }} />
             </Stack>
           </Card>
         </Grid>
 
-        {/* 🟦 BOTONES ACCIÓN */}
+        {/* BOTONES LATERALES */}
         <Grid item xs={12} md={4}>
           <Stack spacing={2}>
             <Button
@@ -352,28 +370,28 @@ const handleChangeOrganization = () => {
               startIcon={<AssignmentIndIcon />}
               fullWidth
               size="large"
+              onClick={() => setOpenAssignModal(true)}
+              sx={{
+                background: "linear-gradient(135deg, #007BFF 0%, #28A745 100%)",
+                color: "white",
+                fontWeight: 600,
+              }}
             >
               Asignar Turno
             </Button>
 
-            <Button
-              variant="outlined"
-              startIcon={<BlockIcon />}
-              fullWidth
-              size="large"
-            >
+            <Button variant="outlined" startIcon={<BlockIcon />} fullWidth size="large">
               Bloquear Agenda
             </Button>
           </Stack>
         </Grid>
 
-       
         <Grid item xs={12} md={4}>
           <DayOccupancyCard appointments={turnos} />
-      </Grid>
+        </Grid>
       </Grid>
 
-      {/* 🗂️ TABLA PRINCIPAL */}
+      {/* TABLA */}
       <Typography variant="h6" mt={4} mb={1}>
         Turnos del día
       </Typography>
@@ -382,25 +400,314 @@ const handleChangeOrganization = () => {
         rows={turnos}
         columns={columns}
         autoHeight
+        getRowId={(row) => row.id}
         disableRowSelectionOnClick
         pageSizeOptions={[5, 10, 20]}
-        initialState={{
-          pagination: { paginationModel: { pageSize: 10 } },
-        }}
       />
 
-      {/* 🟩 RESUMEN RÁPIDO */}
-      <Typography variant="h6" mt={5} mb={1}>
-        Resumen de la jornada
-      </Typography>
+     {/* MODAL ASIGNAR */}
+{/* MODAL ASIGNAR TURNO */}
+<Dialog
+  open={openAssignModal}
+  onClose={() => setOpenAssignModal(false)}
+  maxWidth="sm"
+  fullWidth
+  PaperProps={{
+    sx: { borderRadius: 3, p: 0.5 }
+  }}
+>
+  <DialogTitle
+    sx={{
+      fontWeight: 700,
+      pb: 0,
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+    }}
+  >
+    Asignar Turno
 
-      <Card sx={{ p: 2, borderRadius: 2 }}>
-        <Stack direction="row" spacing={3}>
-          <Typography>Próximo turno: <strong>-</strong></Typography>
-          <Typography>Tiempo libre hoy: <strong>-</strong></Typography>
-          <Typography>Nuevos clientes hoy: <strong>-</strong></Typography>
-        </Stack>
-      </Card>
+    <IconButton onClick={() => setOpenAssignModal(false)}>
+      <CloseIcon />
+    </IconButton>
+  </DialogTitle>
+
+  <DialogContent sx={{ mt: 2 }}>
+    <Typography variant="body2" sx={{ mb: 2, color: "text.secondary" }}>
+      Seleccioná un turno libre y asignalo a un cliente.
+    </Typography>
+
+    {/* ------------------------- */}
+    {/*   SELECT DE TURNOS       */}
+    {/* ------------------------- */}
+    <TextField
+      select
+      fullWidth
+      label="Turno disponible"
+      margin="normal"
+      value={selectedBooking}
+      onChange={(e) => setSelectedBooking(Number(e.target.value))}
+      SelectProps={{ native: true }}
+      InputProps={{
+        startAdornment: (
+          <InputAdornment position="start">
+            <EventAvailableIcon color="action" />
+          </InputAdornment>
+        ),
+      }}
+    >
+      <option value="">-- Seleccionar turno --</option>
+
+      {turnos
+        .filter((t) => t.status === "FREE" || t.status === "PENDING")
+        .map((t) => (
+          <option key={t.id} value={t.id}>
+            {new Date(t.startTime).toLocaleTimeString("es-AR", {
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </option>
+        ))}
+    </TextField>
+
+    {/* ------------------------- */}
+    {/*   CLIENTE + CREAR NUEVO  */}
+    {/* ------------------------- */}
+    <Box sx={{ mt: 3 }}>
+      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <Typography fontWeight={600}>
+          Cliente
+        </Typography>
+
+        <Button
+          size="small"
+          variant="outlined"
+          onClick={() => setCreateClientOpen(true)}
+          sx={{ textTransform: "none" }}
+        >
+          + Nuevo Cliente
+        </Button>
+      </Box>
+
+      <Autocomplete
+        fullWidth
+        options={clients}
+        getOptionLabel={(c) =>
+          `${c.fullName} — ${c.phone || "Sin teléfono"}`
+        }
+        renderInput={(params) => (
+          <TextField
+            {...params}
+            label="Buscar cliente..."
+            margin="normal"
+            InputProps={{
+              ...params.InputProps,
+              startAdornment: (
+                <>
+                  <InputAdornment position="start">
+                    <PersonIcon color="action" />
+                  </InputAdornment>
+                  {params.InputProps.startAdornment}
+                </>
+              ),
+            }}
+          />
+        )}
+        filterOptions={(options, { inputValue }) =>
+          options.filter(
+            (c) =>
+              c.fullName.toLowerCase().includes(inputValue.toLowerCase()) ||
+              (c.phone || "").toLowerCase().includes(inputValue.toLowerCase()) ||
+              (c.email || "").toLowerCase().includes(inputValue.toLowerCase())
+          )
+        }
+        value={clients.find((c) => c.id === selectedClient) || null}
+        onChange={(_, value) =>
+          setSelectedClient(value ? value.id : "")
+        }
+      />
+    </Box>
+  </DialogContent>
+
+  <DialogActions sx={{ p: 2.5, pt: 1 }}>
+    <Button
+      onClick={() => setOpenAssignModal(false)}
+      sx={{ textTransform: "none" }}
+    >
+      Cancelar
+    </Button>
+
+    <Button
+      variant="contained"
+      onClick={handleConfirmAssign}
+      disabled={assignLoading}
+      sx={{
+        textTransform: "none",
+        fontWeight: 600,
+        px: 4,
+      }}
+    >
+      {assignLoading ? "Asignando..." : "Asignar turno"}
+    </Button>
+  </DialogActions>
+</Dialog>
+
+{/* MODAL CREAR CLIENTE */}
+<Dialog
+  open={createClientOpen}
+  onClose={() => setCreateClientOpen(false)}
+  maxWidth="sm"
+  fullWidth
+  PaperProps={{
+    sx: { borderRadius: 3, p: 0.5 }
+  }}
+>
+  <DialogTitle
+    sx={{
+      fontWeight: 700,
+      pb: 0,
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+    }}
+  >
+    Nuevo Cliente
+
+    <IconButton onClick={() => setCreateClientOpen(false)}>
+      <CloseIcon />
+    </IconButton>
+  </DialogTitle>
+
+  <DialogContent sx={{ mt: 2 }}>
+    <Typography variant="body2" sx={{ mb: 2, color: "text.secondary" }}>
+      Completá los datos para registrar un nuevo cliente.
+    </Typography>
+
+    {/* Nombre */}
+    <TextField
+      fullWidth
+      label="Nombre completo"
+      margin="normal"
+      value={newClient.fullName}
+      onChange={(e) =>
+        setNewClient({ ...newClient, fullName: e.target.value })
+      }
+      InputProps={{
+        startAdornment: (
+          <InputAdornment position="start">
+            <PersonIcon color="action" />
+          </InputAdornment>
+        ),
+      }}
+    />
+
+    {/* Teléfono */}
+    <TextField
+      fullWidth
+      label="Teléfono"
+      margin="normal"
+      value={newClient.phone}
+      onChange={(e) =>
+        setNewClient({ ...newClient, phone: e.target.value })
+      }
+      placeholder="Ej: 2494123456"
+      InputProps={{
+        startAdornment: (
+          <InputAdornment position="start">
+            <PhoneIcon color="action" />
+          </InputAdornment>
+        ),
+      }}
+    />
+
+    {/* Email */}
+    <TextField
+      fullWidth
+      label="Email"
+      margin="normal"
+      value={newClient.email}
+      onChange={(e) =>
+        setNewClient({ ...newClient, email: e.target.value })
+      }
+      InputProps={{
+        startAdornment: (
+          <InputAdornment position="start">
+            <EmailIcon color="action" />
+          </InputAdornment>
+        ),
+      }}
+    />
+  </DialogContent>
+
+  <DialogActions sx={{ p: 2.5, pt: 1 }}>
+    <Button
+      onClick={() => setCreateClientOpen(false)}
+      sx={{ textTransform: "none" }}
+    >
+      Cancelar
+    </Button>
+
+    <Button
+      variant="contained"
+      onClick={async () => {
+        try {
+          setCreatingClient(true);
+
+          const res = await authFetch("/clients", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(newClient),
+          });
+
+          const json = await res.json();
+          const created = json.data ?? json;
+
+          setClients((prev) => [...prev, created]);
+          setSelectedClient(created.id);
+          setCreateClientOpen(false);
+          setNewClient({ fullName: "", phone: "", email: "" });
+
+          showToast("Cliente creado correctamente", "success");
+        } catch (err) {
+          console.error("Error creando cliente:", err);
+          showToast("No se pudo crear el cliente", "error");
+        } finally {
+          setCreatingClient(false);
+        }
+      }}
+      disabled={creatingClient}
+      sx={{
+        textTransform: "none",
+        px: 4,
+        fontWeight: 600,
+      }}
+    >
+      {creatingClient ? "Guardando..." : "Crear cliente"}
+    </Button>
+  </DialogActions>
+</Dialog>
+
+<Snackbar
+  open={snackbar.open}
+  autoHideDuration={3500}
+  onClose={handleCloseSnackbar}
+  anchorOrigin={{ vertical: "top", horizontal: "right" }}
+>
+  <Alert
+    onClose={handleCloseSnackbar}
+    severity={snackbar.severity}
+    variant="filled"
+    sx={{
+      width: "100%",
+      fontWeight: 600,
+      borderRadius: 2,
+      boxShadow: "0 4px 12px rgba(0,0,0,0.25)",
+    }}
+  >
+    {snackbar.message}
+  </Alert>
+</Snackbar>
+
     </Box>
   );
 }

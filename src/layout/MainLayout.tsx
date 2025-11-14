@@ -148,37 +148,78 @@ export default function MainLayout() {
 
   return (
     <Box sx={{ display: "flex" }}>
-      {/* 🔝 Header superior */}
-      <AppBar
-        position="fixed"
-        sx={{
-          zIndex: theme.zIndex.drawer + 2,
-          bgcolor: "primary.main",
-          color: "white",
-        }}
-      >
-        <Toolbar sx={{ display: "flex", justifyContent: "space-between" }}>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            {!isDesktop && (
-              <IconButton color="inherit" edge="start" onClick={toggleMobileMenu}>
-                <MenuIcon />
-              </IconButton>
-            )}
-            <Typography variant="h6" fontWeight={600}>
-              WATurnos
-            </Typography>
-          </Box>
+     {/* 🔝 Header superior */}
+<AppBar
+  position="fixed"
+  sx={{
+    zIndex: theme.zIndex.drawer + 2,
+    background: "linear-gradient(135deg, #007BFF 0%, #28A745 100%)",
+    boxShadow: "0 4px 18px rgba(0,0,0,0.25)",
+    backdropFilter: "blur(6px)",
+    color: "white",
+  }}
+>
+  <Toolbar
+    sx={{
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      py: 1,
+    }}
+  >
+    {/* 🔹 Logo + organización */}
+    <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+      {!isDesktop && (
+        <IconButton color="inherit" edge="start" onClick={toggleMobileMenu}>
+          <MenuIcon />
+        </IconButton>
+      )}
 
-          <Button
-            color="inherit"
-            startIcon={<LogoutIcon />}
-            onClick={signOut}
-            sx={{ "&:hover": { backgroundColor: "rgba(255,255,255,0.1)" } }}
+      <Box sx={{ display: "flex", flexDirection: "column", lineHeight: 1 }}>
+        <Typography
+          variant="h6"
+          sx={{ fontWeight: 700, letterSpacing: "0.5px" }}
+        >
+          WATurnos
+        </Typography>
+
+        {/* 🏢 Mostrar organización seleccionada */}
+        {localStorage.getItem("organizationName") && (
+          <Typography
+            variant="caption"
+            sx={{ opacity: 0.9 }}
           >
-            Salir
-          </Button>
-        </Toolbar>
-      </AppBar>
+            {localStorage.getItem("organizationName")}
+
+            {localStorage.getItem("providerName")
+              ? ` — ${localStorage.getItem("providerName")}`
+              : ""}
+          </Typography>
+        )}
+      </Box>
+    </Box>
+
+    {/* 🔹 Botón Salir */}
+    <Button
+      color="inherit"
+      startIcon={<LogoutIcon />}
+      onClick={signOut}
+      sx={{
+        px: 2.5,
+        py: 0.8,
+        borderRadius: 2,
+        fontWeight: 600,
+        textTransform: "none",
+        backgroundColor: "rgba(255,255,255,0.18)",
+        "&:hover": {
+          backgroundColor: "rgba(255,255,255,0.28)",
+        },
+      }}
+    >
+      Salir
+    </Button>
+  </Toolbar>
+</AppBar>
 
       {/* 📋 Drawer lateral permanente (desktop) */}
       {isDesktop && (
