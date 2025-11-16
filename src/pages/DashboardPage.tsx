@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { DataGrid, GridRenderCellParams } from "@mui/x-data-grid";
 // authFetch wrapper retained for compatibility in api/http.ts but not used here
 import { useAuth } from "../auth/AuthContext";
-import { getTodayByProvider } from "../api/bookings";
+import { getTodayByProvider, getRangeByProvider } from "../api/bookings";
 import { getClients, createClient } from "../api/clients";
 import type { ClientDTO } from "../types/dto";
 import type { Appointment } from "../types/types";
@@ -55,6 +55,7 @@ export default function Dashboard() {
   // Estados principales
   // -------------------------------------------------
   const [turnos, setTurnos] = useState<Appointment[]>([]);
+  const [nextDayLabel, setNextDayLabel] = useState<string | null>(null);
   const [clients, setClients] = useState<ClientDTO[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -93,8 +94,69 @@ export default function Dashboard() {
     try {
       setLoading(true);
       const json = await getTodayByProvider(provId);
-      const list = json.data ?? json ?? [];
-      setTurnos(list);
+      const list = (json.data ?? json ?? []) as Appointment[];
+
+      if (list.length > 0) {
+        setTurnos(list);
+        setNextDayLabel(null);
+      } else {
+        // If today's endpoint returns no turnos, fetch the next 7 days and pick the next day that has bookings
+        const today = new Date();
+        const pad = (n: number) => String(n).padStart(2, "0");
+        const startDate = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+        const end = new Date(today);
+        end.setDate(end.getDate() + 7);
+        const endDate = `${end.getFullYear()}-${pad(end.getMonth() + 1)}-${pad(end.getDate())}`;
+
+        try {
+          const rangeJson = await getRangeByProvider(provId, startDate, endDate);
+          const grouped = rangeJson.data ?? rangeJson ?? {};
+
+          // Find the earliest day with bookings
+          const dayKeys = Object.keys(grouped).sort();
+          let foundDay: string | null = null;
+          for (const day of dayKeys) {
+            const services = grouped[day] as any[];
+            const hasBookings = services.some((s) => (s.bookings ?? []).length > 0);
+            if (hasBookings) {
+              foundDay = day;
+              break;
+            }
+          }
+
+          if (foundDay) {
+            const services = grouped[foundDay] as any[];
+            const flattened: Appointment[] = [];
+            services.forEach((svc) => {
+              const svcName = svc.serviceName || svc.name || "";
+              (svc.bookings ?? []).forEach((b: any) => {
+                flattened.push({
+                  id: b.id,
+                  startTime: b.startTime,
+                  endTime: b.endTime,
+                  status: b.status,
+                  clientName: null,
+                  serviceName: svcName,
+                });
+              });
+            });
+            setTurnos(flattened);
+            // Guardar etiqueta para mostrar en el encabezado (DD-MM)
+            try {
+              const [y, m, d] = foundDay.split("-");
+              setNextDayLabel(`${d}-${m}`);
+            } catch (err) {
+              setNextDayLabel(null);
+            }
+          } else {
+            setTurnos([]);
+            setNextDayLabel(null);
+          }
+        } catch (err) {
+          console.error("Error cargando rango de turnos:", err);
+          setTurnos([]);
+        }
+      }
     } catch (err) {
       console.error("Error cargando turnos:", err);
     } finally {
@@ -342,7 +404,9 @@ export default function Dashboard() {
       <Grid container spacing={3}>
         <Grid item xs={12} md={8}>
           <Card sx={{ borderRadius: 2, p: 2 }}>
-            <Typography variant="h6">Turnos de Hoy</Typography>
+            <Typography variant="h6">
+              {nextDayLabel ? `Próximo día con turnos: ${nextDayLabel}` : "Turnos de Hoy"}
+            </Typography>
 
             <Stack direction="row" spacing={2} mt={2}>
               <Chip label={`Libres: ${count.free}`} sx={{ bgcolor: "#FFF3CD" }} />

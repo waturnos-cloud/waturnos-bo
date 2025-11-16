@@ -120,6 +120,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener("auth:logout", handler as EventListener);
   }, []);
 
+  // Escuchar actualizaciones globales de auth (por ejemplo providerId cambiado desde otra página)
+  useEffect(() => {
+    const handler = (e: Event) => {
+      try {
+        const detail = (e as CustomEvent)?.detail ?? {};
+        if (detail.providerId !== undefined) setProviderId(detail.providerId ? Number(detail.providerId) : undefined);
+        if (detail.organizationId !== undefined) setOrganizationId(detail.organizationId ? Number(detail.organizationId) : undefined);
+        if (detail.userId !== undefined) setUserId(detail.userId ? Number(detail.userId) : undefined);
+        if (detail.role !== undefined) setRole(detail.role || undefined);
+      } catch (err) {
+        // ignore
+      }
+    };
+
+    window.addEventListener("auth:update", handler as EventListener);
+    return () => window.removeEventListener("auth:update", handler as EventListener);
+  }, []);
+
   const value = useMemo(
     () => ({
       isAuth,

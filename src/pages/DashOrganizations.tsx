@@ -232,6 +232,15 @@ const handleSelect = async (org: import('../types/dto').OrganizationDTO) => {
         const provider = providers[0];
         if (provider.id) localStorage.setItem("providerId", String(provider.id));
         if (provider.fullName) localStorage.setItem("providerName", provider.fullName);
+        // Notify AuthProvider about the new provider selection
+        window.dispatchEvent(new CustomEvent("auth:update", {
+          detail: {
+            providerId: provider.id,
+            providerName: provider.fullName,
+            organizationId: org.id,
+            organizationName: org.name,
+          }
+        }));
       }
 
       navigate("/", { replace: true });

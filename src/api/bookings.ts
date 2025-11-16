@@ -12,6 +12,11 @@ export async function getTodayByProvider(providerId: number) {
   return data;
 }
 
+export async function getRangeByProvider(providerId: number, startDate: string, endDate: string) {
+  const { data } = await api.get(`/bookings/range?providerId=${providerId}&startDate=${startDate}&endDate=${endDate}`);
+  return data;
+}
+
 export async function createBookings(arr: BookingDTO[]) {
   const { data } = await api.post('/bookings', arr);
   return data;

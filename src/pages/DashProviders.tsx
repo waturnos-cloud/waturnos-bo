@@ -83,6 +83,14 @@ export default function DashProviders(): JSX.Element {
     try {
       if (prov.id) localStorage.setItem("providerId", String(prov.id));
       if (prov.fullName) localStorage.setItem("providerName", prov.fullName);
+      // Notify AuthProvider about provider change
+      window.dispatchEvent(new CustomEvent("auth:update", {
+        detail: {
+          providerId: prov.id,
+          providerName: prov.fullName,
+        }
+      }));
+
       navigate("/", { replace: true });
     } catch (err) {
       console.error("Error seleccionando proveedor:", err);
