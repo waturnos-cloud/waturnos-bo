@@ -27,58 +27,37 @@ import {
   ErrorOutline as ErrorIcon,
   WarningAmber as WarningIcon,
 } from "@mui/icons-material";
-import { authFetch } from "../api/http";
+import React from 'react';
+// authFetch wrapper retained for compatibility in api/http.ts; using typed helpers instead
+import { getProvidersByOrg, createProvider } from "../api/organizations";
+import { useNotification } from "../contexts/NotificationContext";
+import { useNavigate } from "react-router-dom";
+import type { ProviderDTO } from "../types/dto";
 
-function SlideTransition(props: any) {
+function SlideTransition(props: React.ComponentProps<typeof Slide>) {
   return <Slide {...props} direction="left" />;
 }
 
-export default function DashProviders() {
-  const [providers, setProviders] = useState<any[]>([]);
+export default function DashProviders(): JSX.Element {
+  const [providers, setProviders] = useState<ProviderDTO[]>([]);
   const [loading, setLoading] = useState(true);
-  const [snackbar, setSnackbar] = useState({
-    open: false,
-    message: "",
-    severity: "success" as "success" | "error" | "warning",
-  });
+  const { notify } = useNotification();
   const [openDialog, setOpenDialog] = useState(false);
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
     phone: "",
-    fotoUrl: "",
     bio: "",
+    fotoUrl: "",
   });
 
-  const orgId = localStorage.getItem("organizationId");
+  const orgId = Number(localStorage.getItem("organizationId"));
+  const isSimple = localStorage.getItem("organizationType") === "simple";
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (orgId) loadProviders(orgId);
   }, [orgId]);
-
-  const loadProviders = async (id: string) => {
-    try {
-      const res = await authFetch(`/users/providers/${id}`);
-      const json = await res.json();
-      const list = Array.isArray(json) ? json : json.data ?? [];
-      setProviders(list);
-    } catch (err) {
-      console.error("Error al cargar proveedores:", err);
-      showToast("Error al cargar proveedores", "error");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const showToast = (message: string, severity: "success" | "error" | "warning") => {
-    setSnackbar({ open: true, message, severity });
-  };
-
-  const handleSelect = (prov: any) => {
-    localStorage.setItem("providerId", prov.id);
-    localStorage.setItem("providerName", prov.fullName);
-    window.location.href = "/";
-  };
 
   const handleOpenDialog = () => setOpenDialog(true);
   const handleCloseDialog = () => setOpenDialog(false);
@@ -88,39 +67,51 @@ export default function DashProviders() {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  const loadProviders = async (orgIdNum: number) => {
+    try {
+      setLoading(true);
+      const json = await getProvidersByOrg(orgIdNum);
+      setProviders(json.data ?? json ?? []);
+    } catch (err) {
+      console.error("Error cargando proveedores:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSelect = (prov: ProviderDTO) => {
+    try {
+      if (prov.id) localStorage.setItem("providerId", String(prov.id));
+      if (prov.fullName) localStorage.setItem("providerName", prov.fullName);
+      navigate("/", { replace: true });
+    } catch (err) {
+      console.error("Error seleccionando proveedor:", err);
+    }
+  };
+
   const handleCreateProvider = async () => {
     try {
       if (!orgId) return;
 
       const { fullName, email, phone, bio } = formData;
       if (!fullName || !email || !phone || !bio) {
-        showToast("Por favor completá todos los campos obligatorios.", "warning");
+        notify("Por favor completá todos los campos obligatorios.", "warning");
         return;
       }
 
-      const res = await authFetch(`/users/providers/${orgId}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
-      });
-
-      if (!res.ok) throw new Error(`Error al crear proveedor: ${res.statusText}`);
-
-      const json = await res.json();
+      const json = await createProvider(orgId, formData);
       const provider = json.data ?? json;
 
       if (provider?.id) {
-        showToast(`Proveedor ${provider.fullName} creado con éxito.`, "success");
+        notify(`Proveedor ${provider.fullName} creado con éxito.`, "success");
         setOpenDialog(false);
         await loadProviders(orgId);
       }
     } catch (err) {
       console.error("Error al crear proveedor:", err);
-      showToast("No se pudo crear el proveedor. Ver consola para más detalles.", "error");
+      notify("No se pudo crear el proveedor. Ver consola para más detalles.", "error");
     }
   };
-
-  const handleCloseSnackbar = () => setSnackbar({ ...snackbar, open: false });
 
   const getToastIcon = (severity: string) => {
     switch (severity) {
@@ -200,8 +191,8 @@ export default function DashProviders() {
               <CardActionArea onClick={() => handleSelect(prov)}>
                 <CardContent sx={{ textAlign: "center", p: 3 }}>
                   <Avatar
-                    src={prov.photoUrl}
-                    alt={prov.fullName}
+                    src={prov.photoUrl ?? undefined}
+                    alt={prov.fullName ?? undefined}
                     sx={{
                       width: 64,
                       height: 64,
@@ -286,31 +277,7 @@ export default function DashProviders() {
         </DialogActions>
       </Dialog>
 
-      {/* 🟢 Toast */}
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={3500}
-        onClose={handleCloseSnackbar}
-        TransitionComponent={SlideTransition}
-        anchorOrigin={{ vertical: "top", horizontal: "right" }}
-      >
-        <Alert
-          icon={getToastIcon(snackbar.severity)}
-          onClose={handleCloseSnackbar}
-          severity={snackbar.severity}
-          variant="filled"
-          sx={{
-            width: "100%",
-            fontWeight: 600,
-            borderRadius: 2,
-            boxShadow: "0 4px 12px rgba(0,0,0,0.25)",
-            backgroundColor:
-              snackbar.severity === "warning" ? "#FFA000" : undefined,
-          }}
-        >
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
+      {/* Notifications handled by NotificationProvider */}
 
       {/* ➕ FAB flotante */}
       <Tooltip title="Agregar proveedor">

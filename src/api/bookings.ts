@@ -7,6 +7,11 @@ export async function getByService(serviceId: number) {
   return data as BookingDTO[];
 }
 
+export async function getTodayByProvider(providerId: number) {
+  const { data } = await api.get(`/bookings/today?providerId=${providerId}`);
+  return data;
+}
+
 export async function createBookings(arr: BookingDTO[]) {
   const { data } = await api.post('/bookings', arr);
   return data;

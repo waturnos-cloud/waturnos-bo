@@ -1,7 +1,13 @@
 import { useEffect, useState } from "react";
-import { DataGrid } from "@mui/x-data-grid";
-import { authFetch } from "../api/http";
+import { useNotification } from "../contexts/NotificationContext";
+import { useNavigate } from "react-router-dom";
+import { DataGrid, GridRenderCellParams } from "@mui/x-data-grid";
+// authFetch wrapper retained for compatibility in api/http.ts but not used here
 import { useAuth } from "../auth/AuthContext";
+import { getTodayByProvider } from "../api/bookings";
+import { getClients, createClient } from "../api/clients";
+import type { ClientDTO } from "../types/dto";
+import type { Appointment } from "../types/types";
 import DayOccupancyCard from "../components/DayOccupancyCard";
 import { Autocomplete } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
@@ -48,43 +54,30 @@ export default function Dashboard() {
   // -------------------------------------------------
   // Estados principales
   // -------------------------------------------------
-  const [turnos, setTurnos] = useState<any[]>([]);
-  const [clients, setClients] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [turnos, setTurnos] = useState<Appointment[]>([]);
+  const [clients, setClients] = useState<ClientDTO[]>([]);
+  const [loading, setLoading] = useState(false);
 
   // Modal asignar turno
   const [openAssignModal, setOpenAssignModal] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<number | "">("");
   const [selectedClient, setSelectedClient] = useState<number | "">("");
   const [assignLoading, setAssignLoading] = useState(false);
-const [createClientOpen, setCreateClientOpen] = useState(false);
-const [newClient, setNewClient] = useState({
-  fullName: "",
-  phone: "",
-  email: "",
-});
-const [creatingClient, setCreatingClient] = useState(false);
+  const [createClientOpen, setCreateClientOpen] = useState(false);
+  const [newClient, setNewClient] = useState<ClientDTO>({
+    fullName: "",
+    phone: "",
+    email: "",
+  });
+  const [creatingClient, setCreatingClient] = useState(false);
 
 
-const [snackbar, setSnackbar] = useState({
-  open: false,
-  message: "",
-  severity: "success" as "success" | "error" | "warning",
-});
-
-const showToast = (
-  message: string,
-  severity: "success" | "error" | "warning"
-) => {
-  setSnackbar({ open: true, message, severity });
-};
-
-const handleCloseSnackbar = () =>
-  setSnackbar((prev) => ({ ...prev, open: false }));
+  const { notify } = useNotification();
 
   // Datos guardados en localStorage
   const organizationName = localStorage.getItem("organizationName");
   const providerName = localStorage.getItem("providerName");
+  const navigate = useNavigate();
 
   // -------------------------------------------------
   // Cargar datos principales
@@ -99,9 +92,9 @@ const handleCloseSnackbar = () =>
   const loadTurnos = async (provId: number) => {
     try {
       setLoading(true);
-      const res = await authFetch(`/bookings/today?providerId=${provId}`);
-      const json = await res.json();
-      setTurnos(json.data ?? []);
+      const json = await getTodayByProvider(provId);
+      const list = json.data ?? json ?? [];
+      setTurnos(list);
     } catch (err) {
       console.error("Error cargando turnos:", err);
     } finally {
@@ -111,9 +104,8 @@ const handleCloseSnackbar = () =>
 
   const loadClients = async () => {
     try {
-      const res = await authFetch("/clients");
-      const json = await res.json();
-      setClients(json.data ?? json);
+      const json = await getClients();
+      setClients(json.data ?? json ?? []);
     } catch (err) {
       console.error("Error cargando clientes:", err);
     }
@@ -136,7 +128,7 @@ const handleCloseSnackbar = () =>
         clientId: Number(selectedClient),
       });
 
-      showToast("El turno fue asignado correctamente.", "success");
+      notify("El turno fue asignado correctamente.", "success");
       setOpenAssignModal(false);
       setSelectedBooking("");
       setSelectedClient("");
@@ -144,7 +136,7 @@ const handleCloseSnackbar = () =>
       if (providerId) loadTurnos(providerId);
     } catch (err) {
       console.error("Error asignando turno:", err);
-      alert("No se pudo asignar el turno.");
+      notify("No se pudo asignar el turno.", "error");
     } finally {
       setAssignLoading(false);
     }
@@ -163,7 +155,7 @@ const handleCloseSnackbar = () =>
     localStorage.removeItem("providerId");
     localStorage.removeItem("providerName");
 
-    window.location.href = "/dashboard-orgs";
+    navigate("/dashboard-orgs");
   };
 
   // -------------------------------------------------
@@ -186,8 +178,8 @@ const handleCloseSnackbar = () =>
       field: "startTime",
       headerName: "Inicio",
       width: 120,
-      renderCell: (params: any) => {
-        const date = new Date(params.value);
+      renderCell: (params: GridRenderCellParams<Appointment, any, any>) => {
+        const date = new Date(params.value as string);
         return date.toLocaleTimeString("es-AR", {
           hour: "2-digit",
           minute: "2-digit",
@@ -202,8 +194,8 @@ const handleCloseSnackbar = () =>
       field: "status",
       headerName: "Estado",
       width: 140,
-      renderCell: (params: any) => {
-        const st = estadoUI[params.value] ?? estadoUI["FREE"];
+      renderCell: (params: GridRenderCellParams<Appointment, any, any>) => {
+        const st = estadoUI[params.value as string] ?? estadoUI["FREE"];
         return (
           <Chip
             size="small"
@@ -223,8 +215,8 @@ const handleCloseSnackbar = () =>
       headerName: "Acciones",
       width: 200,
       sortable: false,
-      renderCell: (params: any) => {
-        const turno = params.row;
+      renderCell: (params: GridRenderCellParams<Appointment, any, any>) => {
+        const turno = params.row as Appointment;
 
         return (
           <Stack direction="row" spacing={1}>
@@ -400,313 +392,293 @@ const handleCloseSnackbar = () =>
         rows={turnos}
         columns={columns}
         autoHeight
-        getRowId={(row) => row.id}
         disableRowSelectionOnClick
         pageSizeOptions={[5, 10, 20]}
+        initialState={{
+          sorting: {
+            sortModel: [{ field: "startTime", sort: "asc" }],
+          },
+          pagination: { paginationModel: { pageSize: 10 } },
+        }}
       />
 
-     {/* MODAL ASIGNAR */}
-{/* MODAL ASIGNAR TURNO */}
-<Dialog
-  open={openAssignModal}
-  onClose={() => setOpenAssignModal(false)}
-  maxWidth="sm"
-  fullWidth
-  PaperProps={{
-    sx: { borderRadius: 3, p: 0.5 }
-  }}
->
-  <DialogTitle
-    sx={{
-      fontWeight: 700,
-      pb: 0,
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-    }}
-  >
-    Asignar Turno
-
-    <IconButton onClick={() => setOpenAssignModal(false)}>
-      <CloseIcon />
-    </IconButton>
-  </DialogTitle>
-
-  <DialogContent sx={{ mt: 2 }}>
-    <Typography variant="body2" sx={{ mb: 2, color: "text.secondary" }}>
-      Seleccioná un turno libre y asignalo a un cliente.
-    </Typography>
-
-    {/* ------------------------- */}
-    {/*   SELECT DE TURNOS       */}
-    {/* ------------------------- */}
-    <TextField
-      select
-      fullWidth
-      label="Turno disponible"
-      margin="normal"
-      value={selectedBooking}
-      onChange={(e) => setSelectedBooking(Number(e.target.value))}
-      SelectProps={{ native: true }}
-      InputProps={{
-        startAdornment: (
-          <InputAdornment position="start">
-            <EventAvailableIcon color="action" />
-          </InputAdornment>
-        ),
-      }}
-    >
-      <option value="">-- Seleccionar turno --</option>
-
-      {turnos
-        .filter((t) => t.status === "FREE" || t.status === "PENDING")
-        .map((t) => (
-          <option key={t.id} value={t.id}>
-            {new Date(t.startTime).toLocaleTimeString("es-AR", {
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
-          </option>
-        ))}
-    </TextField>
-
-    {/* ------------------------- */}
-    {/*   CLIENTE + CREAR NUEVO  */}
-    {/* ------------------------- */}
-    <Box sx={{ mt: 3 }}>
-      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <Typography fontWeight={600}>
-          Cliente
-        </Typography>
-
-        <Button
-          size="small"
-          variant="outlined"
-          onClick={() => setCreateClientOpen(true)}
-          sx={{ textTransform: "none" }}
-        >
-          + Nuevo Cliente
-        </Button>
-      </Box>
-
-      <Autocomplete
+      {/* MODAL ASIGNAR */}
+      {/* MODAL ASIGNAR TURNO */}
+      <Dialog
+        open={openAssignModal}
+        onClose={() => setOpenAssignModal(false)}
+        maxWidth="sm"
         fullWidth
-        options={clients}
-        getOptionLabel={(c) =>
-          `${c.fullName} — ${c.phone || "Sin teléfono"}`
-        }
-        renderInput={(params) => (
+        PaperProps={{
+          sx: { borderRadius: 3, p: 0.5 }
+        }}
+      >
+        <DialogTitle
+          sx={{
+            fontWeight: 700,
+            pb: 0,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          Asignar Turno
+
+          <IconButton onClick={() => setOpenAssignModal(false)}>
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+
+        <DialogContent sx={{ mt: 2 }}>
+          <Typography variant="body2" sx={{ mb: 2, color: "text.secondary" }}>
+            Seleccioná un turno libre y asignalo a un cliente.
+          </Typography>
+
+          {/* ------------------------- */}
+          {/*   SELECT DE TURNOS       */}
+          {/* ------------------------- */}
           <TextField
-            {...params}
-            label="Buscar cliente..."
+            select
+            fullWidth
+            label="Turno disponible"
             margin="normal"
+            value={selectedBooking}
+            onChange={(e) => setSelectedBooking(Number(e.target.value))}
+            SelectProps={{ native: true }}
             InputProps={{
-              ...params.InputProps,
               startAdornment: (
-                <>
-                  <InputAdornment position="start">
-                    <PersonIcon color="action" />
-                  </InputAdornment>
-                  {params.InputProps.startAdornment}
-                </>
+                <InputAdornment position="start">
+                  <EventAvailableIcon color="action" />
+                </InputAdornment>
+              ),
+            }}
+          >
+            <option value="">-- Seleccionar turno --</option>
+
+            {turnos
+              .filter((t) => t.status === "FREE" || t.status === "PENDING")
+              .map((t) => (
+                <option key={t.id} value={t.id}>
+                  {new Date(t.startTime).toLocaleTimeString("es-AR", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </option>
+              ))}
+          </TextField>
+
+          {/* ------------------------- */}
+          {/*   CLIENTE + CREAR NUEVO  */}
+          {/* ------------------------- */}
+          <Box sx={{ mt: 3 }}>
+            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <Typography fontWeight={600}>
+                Cliente
+              </Typography>
+
+              <Button
+                size="small"
+                variant="outlined"
+                onClick={() => setCreateClientOpen(true)}
+                sx={{ textTransform: "none" }}
+              >
+                + Nuevo Cliente
+              </Button>
+            </Box>
+
+            <Autocomplete<ClientDTO>
+              fullWidth
+              options={clients}
+              getOptionLabel={(c) =>
+                `${c.fullName} — ${c.phone || "Sin teléfono"}`
+              }
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Buscar cliente..."
+                  margin="normal"
+                  InputProps={{
+                    ...params.InputProps,
+                    startAdornment: (
+                      <>
+                        <InputAdornment position="start">
+                          <PersonIcon color="action" />
+                        </InputAdornment>
+                        {params.InputProps.startAdornment}
+                      </>
+                    ),
+                  }}
+                />
+              )}
+              filterOptions={(options, { inputValue }) =>
+                options.filter(
+                  (c) =>
+                    c.fullName.toLowerCase().includes(inputValue.toLowerCase()) ||
+                    (c.phone || "").toLowerCase().includes(inputValue.toLowerCase()) ||
+                    (c.email || "").toLowerCase().includes(inputValue.toLowerCase())
+                )
+              }
+              value={clients.find((c) => c.id === selectedClient) || null}
+              onChange={(_, value) =>
+                setSelectedClient(value ? (value.id as number) : "")
+              }
+            />
+          </Box>
+        </DialogContent>
+
+        <DialogActions sx={{ p: 2.5, pt: 1 }}>
+          <Button
+            onClick={() => setOpenAssignModal(false)}
+            sx={{ textTransform: "none" }}
+          >
+            Cancelar
+          </Button>
+
+          <Button
+            variant="contained"
+            onClick={handleConfirmAssign}
+            disabled={assignLoading}
+            sx={{
+              textTransform: "none",
+              fontWeight: 600,
+              px: 4,
+            }}
+          >
+            {assignLoading ? "Asignando..." : "Asignar turno"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* MODAL CREAR CLIENTE */}
+      <Dialog
+        open={createClientOpen}
+        onClose={() => setCreateClientOpen(false)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: { borderRadius: 3, p: 0.5 }
+        }}
+      >
+        <DialogTitle
+          sx={{
+            fontWeight: 700,
+            pb: 0,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          Nuevo Cliente
+
+          <IconButton onClick={() => setCreateClientOpen(false)}>
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+
+        <DialogContent sx={{ mt: 2 }}>
+          <Typography variant="body2" sx={{ mb: 2, color: "text.secondary" }}>
+            Completá los datos para registrar un nuevo cliente.
+          </Typography>
+
+          {/* Nombre */}
+          <TextField
+            fullWidth
+            label="Nombre completo"
+            margin="normal"
+            value={newClient.fullName}
+            onChange={(e) =>
+              setNewClient({ ...newClient, fullName: e.target.value })
+            }
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <PersonIcon color="action" />
+                </InputAdornment>
               ),
             }}
           />
-        )}
-        filterOptions={(options, { inputValue }) =>
-          options.filter(
-            (c) =>
-              c.fullName.toLowerCase().includes(inputValue.toLowerCase()) ||
-              (c.phone || "").toLowerCase().includes(inputValue.toLowerCase()) ||
-              (c.email || "").toLowerCase().includes(inputValue.toLowerCase())
-          )
-        }
-        value={clients.find((c) => c.id === selectedClient) || null}
-        onChange={(_, value) =>
-          setSelectedClient(value ? value.id : "")
-        }
-      />
-    </Box>
-  </DialogContent>
 
-  <DialogActions sx={{ p: 2.5, pt: 1 }}>
-    <Button
-      onClick={() => setOpenAssignModal(false)}
-      sx={{ textTransform: "none" }}
-    >
-      Cancelar
-    </Button>
+          {/* Teléfono */}
+          <TextField
+            fullWidth
+            label="Teléfono"
+            margin="normal"
+            value={newClient.phone}
+            onChange={(e) =>
+              setNewClient({ ...newClient, phone: e.target.value })
+            }
+            placeholder="Ej: 2494123456"
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <PhoneIcon color="action" />
+                </InputAdornment>
+              ),
+            }}
+          />
 
-    <Button
-      variant="contained"
-      onClick={handleConfirmAssign}
-      disabled={assignLoading}
-      sx={{
-        textTransform: "none",
-        fontWeight: 600,
-        px: 4,
-      }}
-    >
-      {assignLoading ? "Asignando..." : "Asignar turno"}
-    </Button>
-  </DialogActions>
-</Dialog>
+          {/* Email */}
+          <TextField
+            fullWidth
+            label="Email"
+            margin="normal"
+            value={newClient.email}
+            onChange={(e) =>
+              setNewClient({ ...newClient, email: e.target.value })
+            }
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <EmailIcon color="action" />
+                </InputAdornment>
+              ),
+            }}
+          />
+        </DialogContent>
 
-{/* MODAL CREAR CLIENTE */}
-<Dialog
-  open={createClientOpen}
-  onClose={() => setCreateClientOpen(false)}
-  maxWidth="sm"
-  fullWidth
-  PaperProps={{
-    sx: { borderRadius: 3, p: 0.5 }
-  }}
->
-  <DialogTitle
-    sx={{
-      fontWeight: 700,
-      pb: 0,
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-    }}
-  >
-    Nuevo Cliente
+        <DialogActions sx={{ p: 2.5, pt: 1 }}>
+          <Button
+            onClick={() => setCreateClientOpen(false)}
+            sx={{ textTransform: "none" }}
+          >
+            Cancelar
+          </Button>
 
-    <IconButton onClick={() => setCreateClientOpen(false)}>
-      <CloseIcon />
-    </IconButton>
-  </DialogTitle>
+          <Button
+            variant="contained"
+            onClick={async () => {
+              try {
+                setCreatingClient(true);
 
-  <DialogContent sx={{ mt: 2 }}>
-    <Typography variant="body2" sx={{ mb: 2, color: "text.secondary" }}>
-      Completá los datos para registrar un nuevo cliente.
-    </Typography>
+                          const json = await createClient(newClient);
+                          const created = json.data ?? json;
 
-    {/* Nombre */}
-    <TextField
-      fullWidth
-      label="Nombre completo"
-      margin="normal"
-      value={newClient.fullName}
-      onChange={(e) =>
-        setNewClient({ ...newClient, fullName: e.target.value })
-      }
-      InputProps={{
-        startAdornment: (
-          <InputAdornment position="start">
-            <PersonIcon color="action" />
-          </InputAdornment>
-        ),
-      }}
-    />
+                          setClients((prev) => [...prev, created]);
+                          setSelectedClient(created.id);
+                setCreateClientOpen(false);
+                setNewClient({ fullName: "", phone: "", email: "" });
 
-    {/* Teléfono */}
-    <TextField
-      fullWidth
-      label="Teléfono"
-      margin="normal"
-      value={newClient.phone}
-      onChange={(e) =>
-        setNewClient({ ...newClient, phone: e.target.value })
-      }
-      placeholder="Ej: 2494123456"
-      InputProps={{
-        startAdornment: (
-          <InputAdornment position="start">
-            <PhoneIcon color="action" />
-          </InputAdornment>
-        ),
-      }}
-    />
+                notify("Cliente creado correctamente", "success");
+              } catch (err) {
+                console.error("Error creando cliente:", err);
+                notify("No se pudo crear el cliente", "error");
+              } finally {
+                setCreatingClient(false);
+              }
+            }}
+            disabled={creatingClient}
+            sx={{
+              textTransform: "none",
+              px: 4,
+              fontWeight: 600,
+            }}
+          >
+            {creatingClient ? "Guardando..." : "Crear cliente"}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
-    {/* Email */}
-    <TextField
-      fullWidth
-      label="Email"
-      margin="normal"
-      value={newClient.email}
-      onChange={(e) =>
-        setNewClient({ ...newClient, email: e.target.value })
-      }
-      InputProps={{
-        startAdornment: (
-          <InputAdornment position="start">
-            <EmailIcon color="action" />
-          </InputAdornment>
-        ),
-      }}
-    />
-  </DialogContent>
-
-  <DialogActions sx={{ p: 2.5, pt: 1 }}>
-    <Button
-      onClick={() => setCreateClientOpen(false)}
-      sx={{ textTransform: "none" }}
-    >
-      Cancelar
-    </Button>
-
-    <Button
-      variant="contained"
-      onClick={async () => {
-        try {
-          setCreatingClient(true);
-
-          const res = await authFetch("/clients", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(newClient),
-          });
-
-          const json = await res.json();
-          const created = json.data ?? json;
-
-          setClients((prev) => [...prev, created]);
-          setSelectedClient(created.id);
-          setCreateClientOpen(false);
-          setNewClient({ fullName: "", phone: "", email: "" });
-
-          showToast("Cliente creado correctamente", "success");
-        } catch (err) {
-          console.error("Error creando cliente:", err);
-          showToast("No se pudo crear el cliente", "error");
-        } finally {
-          setCreatingClient(false);
-        }
-      }}
-      disabled={creatingClient}
-      sx={{
-        textTransform: "none",
-        px: 4,
-        fontWeight: 600,
-      }}
-    >
-      {creatingClient ? "Guardando..." : "Crear cliente"}
-    </Button>
-  </DialogActions>
-</Dialog>
-
-<Snackbar
-  open={snackbar.open}
-  autoHideDuration={3500}
-  onClose={handleCloseSnackbar}
-  anchorOrigin={{ vertical: "top", horizontal: "right" }}
->
-  <Alert
-    onClose={handleCloseSnackbar}
-    severity={snackbar.severity}
-    variant="filled"
-    sx={{
-      width: "100%",
-      fontWeight: 600,
-      borderRadius: 2,
-      boxShadow: "0 4px 12px rgba(0,0,0,0.25)",
-    }}
-  >
-    {snackbar.message}
-  </Alert>
-</Snackbar>
+      {/* Notification handled by NotificationProvider */}
 
     </Box>
   );

@@ -1,15 +1,10 @@
 // types.ts
-export type AppointmentStatus =
-  | "FREE"
-  | "RESERVED"
-  | "CANCELLED"
-  | "COMPLETED"
-  | "NO-SHOW";
+import type { AppointmentStatus } from './enums';
 
 export interface Appointment {
-  id: string;
+  id: number;
   startTime: string; // ISO string
-  endTime?: string;  // opcional
+  endTime?: string; // opcional
   durationMinutes?: number; // opcional
   status: AppointmentStatus;
   clientName?: string | null;

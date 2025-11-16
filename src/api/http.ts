@@ -1,47 +1,56 @@
 // src/api/http.ts
-const BASE_URL =
-  import.meta.env.VITE_API_BASE ?? "http://localhost:8085/msvc-waturnos/v1.0";
+import api from "./axios";
 
 export const getToken = () => localStorage.getItem("jwtToken");
 
 /**
- * Fetch autenticado con manejo de token y CORS.
+ * Compat wrapper para mantener la firma de `authFetch` usada en páginas.
+ * Internamente usa axios instance (`src/api/axios.ts`) para un comportamiento unificado.
+ * Devuelve un objeto con `json()` y `status` para que el código existente (que usa `res.json()`) siga funcionando.
  */
 export async function authFetch(
   input: string,
   init: RequestInit = {}
-): Promise<Response> {
-  const token = getToken();
-  const headers = new Headers(init.headers || {});
+): Promise<{ status: number; json: () => Promise<any> }> {
+  const url = `${input.startsWith("/") ? "" : "/"}${input}`;
 
-  // Añadimos headers por defecto
-  headers.set("Accept", "application/json");
-  headers.set("Content-Type", "application/json");
+  const method = (init.method || "GET") as any;
 
-  // Si hay token, agregamos Bearer
-  if (token) {
-    headers.set("Authorization", `Bearer ${token}`);
+  // intentar parsear body si viene como string JSON
+  let data: any = undefined;
+  if (init.body) {
+    try {
+      data = typeof init.body === "string" ? JSON.parse(init.body as string) : init.body;
+    } catch (e) {
+      data = init.body;
+    }
   }
 
-  // 🔧 Normaliza la URL (evita // en concatenación)
-  const url = `${BASE_URL}${input.startsWith("/") ? "" : "/"}${input}`;
+  // Headers desde init (si los hubiera)
+  const headers = init.headers as Record<string, string> | undefined;
 
-  // 🧠 Configuración final
-  const config: RequestInit = {
-    ...init,
-    headers,
-    mode: "cors", // importante
-    credentials: "omit", // no enviar cookies
-  };
-
-  const res = await fetch(url, config);
-
-  // Si el token expiró, redirigimos al login automáticamente
-  if (res.status === 401 || res.status === 403) {
-    console.warn("⚠️ Sesión expirada o no autorizada, redirigiendo al login...");
-    localStorage.clear();
-    window.location.href = "/login";
+  try {
+    const resp = await api.request({ url, method, data, headers });
+    const ok = resp.status >= 200 && resp.status < 300;
+    return {
+      ok,
+      status: resp.status,
+      statusText: resp.statusText ?? String(resp.status),
+      json: async () => resp.data,
+    } as unknown as { ok: boolean; status: number; statusText: string; json: () => Promise<any> };
+  } catch (err: any) {
+    if (err?.response) {
+      // Axios ya maneja 401 en el interceptor; dispatchamos evento para compatibilidad
+      if (err.response.status === 401 || err.response.status === 403) {
+        window.dispatchEvent(new CustomEvent('auth:logout', { detail: { status: err.response.status } }));
+      }
+      return {
+        ok: err.response.status >= 200 && err.response.status < 300,
+        status: err.response.status,
+        statusText: err.response.statusText ?? String(err.response.status),
+        json: async () => err.response.data,
+      } as unknown as { ok: boolean; status: number; statusText: string; json: () => Promise<any> };
+    }
+    throw err;
   }
-
-  return res;
 }

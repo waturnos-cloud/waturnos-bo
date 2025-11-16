@@ -44,4 +44,23 @@ export interface OrganizationDTO {
   name?: string;
   type?: string;
   logoUrl?: string;
+  simpleOrganization?: boolean;
+  categoryName?: string;
+  subcategoryName?: string;
+  active?: boolean;
+}
+
+export interface ProviderDTO {
+  id?: number;
+  fullName: string;
+  email?: string | null;
+  phone?: string | null;
+  photoUrl?: string | null;
+  bio?: string | null;
+}
+
+export interface CategoryDTO {
+  id?: number;
+  name: string;
+  parentId?: number | null;
 }

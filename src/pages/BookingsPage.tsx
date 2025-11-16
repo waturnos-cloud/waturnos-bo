@@ -13,13 +13,15 @@ import {
   Paper,
   Tooltip,
 } from "@mui/material";
-import { authFetch } from "../api/http";
+// authFetch wrapper retained for compatibility in api/http.ts; using typed helpers instead
 import { useAuth } from "../auth/AuthContext";
+import { getTodayByProvider } from "../api/bookings";
+import type { BookingDTO } from "../types/dto";
 import { createRoot } from "react-dom/client";
 
 export default function BookingsPage() {
   const [events, setEvents] = useState<any[]>([]);
-  const [bookings, setBookings] = useState<any[]>([]);
+  const [bookings, setBookings] = useState<BookingDTO[]>([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<"dayGridMonth" | "timeGridWeek" | "timeGridDay">("dayGridMonth");
   const { providerId } = useAuth();
@@ -37,9 +39,8 @@ export default function BookingsPage() {
 
   const loadBookings = async (provId: number) => {
     try {
-      const res = await authFetch(`/bookings/today?providerId=${provId}`);
-      const json = await res.json();
-      const list = json.data ?? [];
+      const json = await getTodayByProvider(provId);
+      const list = json.data ?? json ?? [];
       setBookings(list);
       setEvents(mapEvents(list, view));
     } catch (err) {
@@ -49,7 +50,7 @@ export default function BookingsPage() {
     }
   };
 
-  const mapEvents = (list: any[], currentView: string) => {
+  const mapEvents = (list: BookingDTO[], currentView: string) => {
     if (currentView === "dayGridMonth") {
       const grouped: Record<string, Record<string, number>> = {};
       list.forEach((b) => {

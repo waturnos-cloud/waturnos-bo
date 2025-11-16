@@ -1,5 +1,6 @@
 // src/auth/AuthContext.tsx
-import { createContext, useContext, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { login } from "../api/auth";
 import type { LoginRequest } from "../types/dto";
 
@@ -17,6 +18,7 @@ const AuthContext = createContext<Ctx>({} as Ctx);
 export const useAuth = () => useContext(AuthContext);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const navigate = useNavigate();
   const [isAuth, setAuth] = useState(!!localStorage.getItem("jwtToken"));
   const [userId, setUserId] = useState<number | undefined>(
     localStorage.getItem("userId") ? Number(localStorage.getItem("userId")) : undefined
@@ -72,28 +74,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     ) => {
       if (role === "ADMIN") {
         // 🔹 Los administradores siempre comienzan en la selección de organizaciones
-        window.location.href = "/dashboard-orgs";
+        navigate("/dashboard-orgs", { replace: true });
         return;
       }
 
       if (role === "MANAGER") {
         // Si el manager no tiene proveedor, va a seleccionar uno
         if (!provId) {
-          window.location.href = "/dashboard-providers";
+          navigate("/dashboard-providers", { replace: true });
         } else {
-          window.location.href = "/";
+          navigate("/", { replace: true });
         }
         return;
       }
 
       if (role === "PROVIDER") {
         // Provider directo al dashboard principal
-        window.location.href = "/";
+        navigate("/", { replace: true });
         return;
       }
 
       // Fallback genérico
-      window.location.href = "/";
+      navigate("/", { replace: true });
     };
 
   /**
@@ -106,8 +108,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setRole(undefined);
     setOrganizationId(undefined);
     setProviderId(undefined);
-    window.location.href = "/login";
+    navigate("/login", { replace: true });
   };
+
+  // Escuchar eventos globales de logout (disparados por axios/http wrappers)
+  useEffect(() => {
+    const handler = () => {
+      signOut();
+    };
+    window.addEventListener("auth:logout", handler as EventListener);
+    return () => window.removeEventListener("auth:logout", handler as EventListener);
+  }, []);
 
   const value = useMemo(
     () => ({

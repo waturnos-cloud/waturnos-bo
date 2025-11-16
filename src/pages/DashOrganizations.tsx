@@ -23,6 +23,7 @@ import {
   Fab,
   Tooltip,
 } from "@mui/material";
+import React from 'react';
 import {
   Add as AddFabIcon,
   AddCircleOutline as AddIcon,
@@ -31,19 +32,25 @@ import {
   WarningAmber as WarningIcon,
 } from "@mui/icons-material";
 import SearchIcon from "@mui/icons-material/Search";
-import { authFetch } from "../api/http";
+// authFetch wrapper retained for compatibility in api/http.ts; using typed helpers instead
 import { useAuth } from "../auth/AuthContext";
+import { getOrganizations, createOrganization, getProvidersByOrg, createProvider } from "../api/organizations";
+import { getCategories, getCategoryChildren } from "../api/categories";
+import type { OrganizationDTO, CategoryDTO, ProviderDTO } from "../types/dto";
+import { useNotification } from "../contexts/NotificationContext";
+import { useNavigate } from "react-router-dom";
 
 import { MapContainer, TileLayer, Marker, useMapEvents } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
-import L from "leaflet";
+import * as L from "leaflet";
+import type { LatLngExpression, DragEndEvent, LeafletMouseEvent } from 'leaflet';
 
 function SlideTransition(props: any) {
   return <Slide {...props} direction="left" />;
 }
 
-// Icono default Leaflet
-const defaultMarkerIcon = new L.Icon({
+// Configure default Leaflet icon (avoid passing `icon` prop to Marker)
+(L as any).Icon.Default.mergeOptions({
   iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
   iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
   shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
@@ -65,7 +72,7 @@ type LocationMarkerProps = {
 
 function LocationMarker({ position, setPosition }: LocationMarkerProps) {
   useMapEvents({
-    click(e) {
+    click(e: LeafletMouseEvent) {
       setPosition((prev) => ({
         ...prev,
         lat: e.latlng.lat,
@@ -76,12 +83,11 @@ function LocationMarker({ position, setPosition }: LocationMarkerProps) {
 
   return (
     <Marker
-      position={[position.lat, position.lng]}
-      icon={defaultMarkerIcon}
-      draggable
+      position={[position.lat, position.lng] as LatLngExpression}
+      draggable={true}
       eventHandlers={{
-        dragend: (event) => {
-          const latlng = (event.target as any).getLatLng();
+        dragend: (event: DragEndEvent) => {
+          const latlng = (event.target as L.Marker).getLatLng();
           setPosition((prev) => ({
             ...prev,
             lat: latlng.lat,
@@ -97,8 +103,8 @@ export default function DashOrganizations() {
   // ------------------------------
   // Estados principales
   // ------------------------------
-  const [organizations, setOrganizations] = useState<any[]>([]);
-  const [filtered, setFiltered] = useState<any[]>([]);
+  const [organizations, setOrganizations] = useState<OrganizationDTO[]>([]);
+  const [filtered, setFiltered] = useState<OrganizationDTO[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [openDialog, setOpenDialog] = useState(false);
@@ -106,12 +112,13 @@ export default function DashOrganizations() {
   const [typeFilter, setTypeFilter] = useState("");
 
   const { userId } = useAuth();
+  const navigate = useNavigate();
 
   // ------------------------------
   // Categorías
   // ------------------------------
-  const [categories, setCategories] = useState<any[]>([]);
-  const [subcategories, setSubcategories] = useState<any[]>([]);
+  const [categories, setCategories] = useState<CategoryDTO[]>([]);
+  const [subcategories, setSubcategories] = useState<CategoryDTO[]>([]);
   const [selectedCategory, setSelectedCategory] = useState("");
   const [selectedSubcategory, setSelectedSubcategory] = useState("");
 
@@ -144,17 +151,9 @@ export default function DashOrganizations() {
   // ------------------------------
   // Toast
   // ------------------------------
-  const [snackbar, setSnackbar] = useState({
-    open: false,
-    message: "",
-    severity: "success" as "success" | "error" | "warning",
-  });
+  const { notify } = useNotification();
 
-  const showToast = (message: string, severity: "success" | "error" | "warning") => {
-    setSnackbar({ open: true, message, severity });
-  };
-
-  const handleCloseSnackbar = () => setSnackbar({ ...snackbar, open: false });
+  const showToast = (message: string, severity: "success" | "error" | "warning") => notify(message, severity);
 
   const getToastIcon = (severity: string) => {
     switch (severity) {
@@ -174,8 +173,7 @@ export default function DashOrganizations() {
 
   const loadOrganizations = async () => {
     try {
-      const res = await authFetch("/organizations");
-      const json = await res.json();
+      const json = await getOrganizations();
       let orgs = json.data ?? json ?? [];
 
       orgs = orgs.sort((a: any, b: any) =>
@@ -195,9 +193,8 @@ export default function DashOrganizations() {
 
   const loadCategories = async () => {
     try {
-      const res = await authFetch("/categories");
-      const json = await res.json();
-      setCategories(json.data ?? json);
+      const json = await getCategories();
+      setCategories(json.data ?? json ?? []);
     } catch (e) {
       console.error("Error cargando categorías:", e);
     }
@@ -208,18 +205,17 @@ export default function DashOrganizations() {
     setSelectedSubcategory("");
 
     try {
-      const res = await authFetch(`/categories/${parentId}/children`);
-      const json = await res.json();
-      setSubcategories(json.data ?? json);
+      const json = await getCategoryChildren(parentId);
+      setSubcategories(json.data ?? json ?? []);
     } catch (e) {
       console.error("Error cargando subcategorías:", e);
     }
   };
 
-const handleSelect = async (org: any) => {
+const handleSelect = async (org: import('../types/dto').OrganizationDTO) => {
   try {
-    localStorage.setItem("organizationId", org.id);
-    localStorage.setItem("organizationName", org.name);
+    if (org.id != null) localStorage.setItem("organizationId", String(org.id));
+    localStorage.setItem("organizationName", org.name || "");
     localStorage.setItem("organizationLogo", org.logoUrl || "");
     localStorage.setItem("organizationType", org.simpleOrganization ? "simple" : "multi");
 
@@ -228,24 +224,23 @@ const handleSelect = async (org: any) => {
     if (org.subcategoryName) localStorage.setItem("organizationSubcategory", org.subcategoryName);
 
     if (org.simpleOrganization) {
-      const res = await authFetch(`/users/providers/${org.id}`);
-      const json = await res.json();
-      const providers = json.data ?? json;
+      if (org.id == null) throw new Error('Organization id missing');
+      const json = await getProvidersByOrg(org.id);
+      const providers = (json.data ?? json) as ProviderDTO[];
 
       if (providers && providers.length > 0) {
         const provider = providers[0];
-        localStorage.setItem("providerId", provider.id);
-        localStorage.setItem("providerName", provider.fullName);
+        if (provider.id) localStorage.setItem("providerId", String(provider.id));
+        if (provider.fullName) localStorage.setItem("providerName", provider.fullName);
       }
 
-      window.location.href = "/";
+      navigate("/", { replace: true });
     } 
     else {
       // MULTI → no seteamos providerId
       localStorage.removeItem("providerId");
       localStorage.removeItem("providerName");
-
-      window.location.href = "/dashboard-providers";
+      navigate("/dashboard-providers", { replace: true });
     }
   } catch (err) {
     console.error("Error al procesar selección de organización:", err);
@@ -356,13 +351,8 @@ const handleSelect = async (org: any) => {
         },
       };
 
-      const res = await authFetch("/organizations", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) throw new Error(`Error al crear organización: ${res.statusText}`);
+      const json = await createOrganization(payload);
+      if (!json) throw new Error('Error al crear organización');
 
       showToast(`Organización "${name}" creada con éxito.`, "success");
       setOpenDialog(false);
@@ -703,9 +693,7 @@ const handleSelect = async (org: any) => {
             }}
           >
             <MapContainer
-              center={[location.lat, location.lng]}
-              zoom={13}
-              style={{ height: "100%", width: "100%" }}
+              {...({ center: [location.lat, location.lng], zoom: 13, style: { height: "100%", width: "100%" } } as any)}
             >
               <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
               <LocationMarker position={location} setPosition={setLocation} />
@@ -723,28 +711,7 @@ const handleSelect = async (org: any) => {
         </DialogActions>
       </Dialog>
 
-      {/* TOAST */}
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={3500}
-        onClose={handleCloseSnackbar}
-        TransitionComponent={SlideTransition}
-        anchorOrigin={{ vertical: "top", horizontal: "right" }}
-      >
-        <Alert
-          icon={getToastIcon(snackbar.severity)}
-          onClose={handleCloseSnackbar}
-          severity={snackbar.severity}
-          variant="filled"
-          sx={{
-            width: "100%",
-            fontWeight: 600,
-            borderRadius: 2,
-          }}
-        >
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
+      {/* Notifications handled by NotificationProvider */}
 
       {/* FAB */}
       <Tooltip title="Agregar organización">

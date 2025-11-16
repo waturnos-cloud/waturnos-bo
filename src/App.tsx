@@ -2,12 +2,14 @@
 import { ThemeProvider, CssBaseline, createTheme } from "@mui/material";
 import { esES as coreEsES } from "@mui/material/locale";
 import { esES as gridEsES } from "@mui/x-data-grid/locales";
+import { theme as baseTheme } from "./theme/theme";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
 import { AuthProvider } from "./auth/AuthContext";
 import ProtectedRoute from "./auth/ProtectedRoute";
 import RoleProtectedRoute from "./auth/RoleProtectedRoute";
 import MainLayout from "./layout/MainLayout";
+import { NotificationProvider } from "./contexts/NotificationContext";
 
 // Páginas
 import LoginPage from "./pages/LoginPage";
@@ -18,29 +20,15 @@ import DashOrganizations from "./pages/DashOrganizations";
 import DashProviders from "./pages/DashProviders";
 
 // 🎨 Tema global (Material UI + español)
-const theme = createTheme(
-  {
-    palette: {
-      mode: "light",
-      primary: { main: "#007BFF" },
-      secondary: { main: "#28A745" },
-      error: { main: "#DC3545" },
-      background: { default: "#f4f6f8" },
-    },
-    typography: {
-      fontFamily: "Inter, Roboto, sans-serif",
-    },
-  },
-  coreEsES,
-  gridEsES
-);
+const theme = createTheme(baseTheme, coreEsES, gridEsES);
 
 export default function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <AuthProvider>
-        <BrowserRouter>
+      <BrowserRouter>
+        <AuthProvider>
+          <NotificationProvider>
           <Routes>
             {/* Página pública */}
             <Route path="/login" element={<LoginPage />} />
@@ -124,8 +112,9 @@ export default function App() {
             {/* Fallback */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
-        </BrowserRouter>
-      </AuthProvider>
+          </NotificationProvider>
+        </AuthProvider>
+      </BrowserRouter>
     </ThemeProvider>
   );
 }
