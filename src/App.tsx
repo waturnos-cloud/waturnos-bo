@@ -18,6 +18,9 @@ import ClientsPage from "./pages/ClientsPage";
 import BookingsPage from "./pages/BookingsPage";
 import DashOrganizations from "./pages/DashOrganizations";
 import DashProviders from "./pages/DashProviders";
+import UsersPage from "./pages/UsersPage";
+import React from 'react';
+const ServicesPage = React.lazy(() => import('./pages/ServicesPage'));
 
 // 🎨 Tema global (Material UI + español)
 const theme = createTheme(baseTheme, coreEsES, gridEsES);
@@ -85,7 +88,7 @@ export default function App() {
                 path="/organization"
                 element={
                   <RoleProtectedRoute allowedRoles={["ADMIN"]}>
-                    <div>Organización (CRUD)</div>
+                    <DashOrganizations />
                   </RoleProtectedRoute>
                 }
               />
@@ -94,7 +97,7 @@ export default function App() {
                 path="/users"
                 element={
                   <RoleProtectedRoute allowedRoles={["ADMIN", "MANAGER"]}>
-                    <div>Usuarios (CRUD)</div>
+                    <UsersPage />
                   </RoleProtectedRoute>
                 }
               />
@@ -103,7 +106,9 @@ export default function App() {
                 path="/services"
                 element={
                   <RoleProtectedRoute allowedRoles={["ADMIN", "MANAGER"]}>
-                    <div>Servicios (CRUD)</div>
+                    <React.Suspense fallback={<div>Cargando...</div>}>
+                      <ServicesPage />
+                    </React.Suspense>
                   </RoleProtectedRoute>
                 }
               />
