@@ -1,4 +1,4 @@
-export type BookingStatus = 'FREE' | 'RESERVED' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED';
+export type BookingStatus = 'FREE' | 'RESERVED' | 'COMPLETED' | 'CANCELLED' | 'NO-SHOW';
 
 export type AppointmentStatus =
 	| 'FREE'

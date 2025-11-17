@@ -177,8 +177,8 @@ export default function BookingsPage() {
         title:
           b.status === "FREE"
             ? "Libre"
-            : b.status === "CONFIRMED"
-            ? "Confirmado"
+            : b.status === "RESERVED"
+            ? "Reservado"
             : b.status === "CANCELLED"
             ? "Cancelado"
             : "Completado",
