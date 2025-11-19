@@ -4,10 +4,10 @@ import { Add as AddFabIcon } from '@mui/icons-material';
 import { useAuth } from '../auth/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { useCRUDList, useForm } from '../hooks';
-import { SelectableCardGrid, CreateFormDialog } from '../components';
-import AvailabilityPicker from '../components/AvailabilityPicker';
+import { SelectableCardGrid, CreateServiceWizard } from '../components';
 import { getServicesByUser, createService, updateService, deleteService } from '../api/services';
 import { getOrganization } from '../api/organizations';
+import { getCategoryChildren } from '../api/categories';
 import type { ClientDTO } from '../types/dto';
 
 export default function ServicesPage() {
@@ -18,14 +18,19 @@ export default function ServicesPage() {
   const [openDialog, setOpenDialog] = React.useState(false);
   const [editingService, setEditingService] = React.useState<any | null>(null);
   const [locations, setLocations] = React.useState<any[]>([]);
+  const [categories, setCategories] = React.useState<any[]>([]);
+  const [organizationType, setOrganizationType] = React.useState<any>(null);
 
   const { formData, handleChange, handleSetField, reset } = useForm<any>({
     name: '',
     description: '',
-    price: 0,
+    categoryId: '',
+    price: '',
     durationMinutes: 30,
+    capacity: 1,
     advancePayment: 0,
     futureDays: 30,
+    workInHollidays: true,
     locationId: '',
     listAvailability: [],
   });
@@ -34,7 +39,13 @@ export default function ServicesPage() {
     const id = providerId ?? userId; // prefer providerId
     if (!id) return [];
     const json = await getServicesByUser(id);
-    return json.data ?? json ?? [];
+    const services = json.data ?? json ?? [];
+    // Transformar type/category a string si es un objeto
+    return services.map((svc: any) => ({
+      ...svc,
+      type: typeof svc.type === 'object' && svc.type?.name ? svc.type.name : svc.type,
+      category: typeof svc.category === 'object' && svc.category?.name ? svc.category.name : svc.category,
+    }));
   }, [providerId, userId]);
 
   const { filtered: services, loading, reload, setCreating, creating } = useCRUDList<any>(loadFn);
@@ -45,7 +56,7 @@ export default function ServicesPage() {
     if (id) reload();
   }, [providerId, userId, reload]);
 
-  // Cargar locations de la organización
+  // Cargar locations de la organización y subcategorías
   React.useEffect(() => {
     const loadOrg = async () => {
       try {
@@ -54,9 +65,26 @@ export default function ServicesPage() {
         const org = json.data ?? json ?? {};
         const locs = org.locations ?? org.locationsList ?? [];
         setLocations(locs);
-        // if only one location, set default in form (also helpful when editing/creating)
+        
+        // Guardar el tipo de organización para obtener subcategorías
+        setOrganizationType(org.type);
+        
+        // Cargar subcategorías si el tipo tiene un id
+        if (org.type && (org.type.id || typeof org.type === 'number')) {
+          const typeId = org.type.id || org.type;
+          const catJson = await getCategoryChildren(typeId);
+          const subcategories = catJson.data ?? catJson ?? [];
+          setCategories(subcategories);
+        }
+        
+        // Preselect location: if only one or find the main one
         if (locs && locs.length === 1) {
           handleChange({ target: { name: 'locationId', value: String(locs[0].id) } } as any);
+        } else if (locs && locs.length > 1) {
+          const mainLocation = locs.find((loc: any) => loc.main === true);
+          if (mainLocation) {
+            handleChange({ target: { name: 'locationId', value: String(mainLocation.id) } } as any);
+          }
         }
       } catch (err) {
         console.error('Error cargando organización:', err);
@@ -73,9 +101,14 @@ export default function ServicesPage() {
   const handleOpenCreate = () => {
     setEditingService(null);
     reset();
-    // if organization has a single location, preselect it
+    // Preselect location: if only one or find the main one
     if (locations.length === 1) {
       handleChange({ target: { name: 'locationId', value: String(locations[0].id) } } as any);
+    } else {
+      const mainLocation = locations.find((loc: any) => loc.main === true);
+      if (mainLocation) {
+        handleChange({ target: { name: 'locationId', value: String(mainLocation.id) } } as any);
+      }
     }
     setOpenDialog(true);
   };
@@ -86,10 +119,13 @@ export default function ServicesPage() {
     const initial = {
       name: svc.name,
       description: svc.description,
+      categoryId: svc.category?.id ?? '',
       price: svc.price,
       durationMinutes: svc.durationMinutes ?? 30,
+      capacity: svc.capacity ?? 1,
       advancePayment: svc.advancePayment ?? 0,
       futureDays: svc.futureDays ?? 30,
+      workInHollidays: svc.workInHollidays ?? true,
       locationId: svc.location?.id ?? '',
       listAvailability: svc.listAvailability ?? [],
     };
@@ -144,14 +180,29 @@ export default function ServicesPage() {
         description: formData.description,
         price: Number(formData.price),
         durationMinutes: Number(formData.durationMinutes),
+        capacity: Number(formData.capacity || 1),
         advancePayment: Number(formData.advancePayment || 0),
         futureDays: Number(formData.futureDays || 0),
       };
 
+      // Transform availability: flatten ranges into individual objects with dayOfWeek, startTime, endTime
+      const flattenedAvailability: any[] = [];
+      (formData.listAvailability || []).forEach((day: any) => {
+        if (day.enabled && day.ranges && day.ranges.length > 0) {
+          day.ranges.forEach((range: any) => {
+            flattenedAvailability.push({
+              dayOfWeek: day.dayOfWeek,
+              startTime: range.start,
+              endTime: range.end,
+            });
+          });
+        }
+      });
+
       const payload = {
         serviceDto,
-        workInHollidays: true,
-        listAvailability: formData.listAvailability || [],
+        workInHollidays: formData.workInHollidays ?? true,
+        listAvailability: flattenedAvailability,
       };
 
       if (editingService) {
@@ -167,9 +218,10 @@ export default function ServicesPage() {
       setOpenDialog(false);
       reset();
       await reload();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error guardando servicio', err);
-      notify('No se pudo guardar el servicio', 'error');
+      const errorMessage = err?.response?.data?.message || err?.message || 'No se pudo guardar el servicio';
+      notify(errorMessage, 'error');
     } finally {
       setCreating(false);
     }
@@ -204,55 +256,16 @@ export default function ServicesPage() {
         )}
       />
 
-      <CreateFormDialog
+      <CreateServiceWizard
         open={openDialog}
-        title={editingService ? 'Editar servicio' : 'Crear servicio'}
-        fields={[
-          { name: 'name', label: 'Nombre', required: true },
-          { name: 'description', label: 'Descripción', required: true },
-          { name: 'price', label: 'Precio', type: 'text', required: true },
-          { name: 'durationMinutes', label: 'Duración (min)', type: 'text' },
-          { name: 'advancePayment', label: 'Pago adelantado', type: 'text' },
-          { name: 'futureDays', label: 'Agenda (días futuros)', type: 'text' },
-          // locationId field will be rendered below as a select via children
-        ]}
-        formData={formData}
-        onFieldChange={(n, v) => handleChange({ target: { name: n, value: v } } as any)}
+        onClose={() => { setOpenDialog(false); reset(); setEditingService(null); }}
         onSubmit={handleSubmit}
-        onCancel={() => { setOpenDialog(false); reset(); setEditingService(null); }}
+        formData={formData}
+        onFieldChange={(name: string, value: any) => handleChange({ target: { name, value } } as any)}
+        locations={locations}
+        categories={categories}
         loading={creating}
-      >
-        {/* Location select: if no locations show info, if one location auto-selected and disabled */}
-        {locations && locations.length > 0 ? (
-          <TextField
-            select
-            label="Sede"
-            name="locationId"
-            value={formData.locationId || ''}
-            onChange={(e) => handleChange({ target: { name: 'locationId', value: e.target.value } } as any)}
-            fullWidth
-            margin="normal"
-            required
-            disabled={locations.length === 1}
-          >
-            {locations.map((loc) => (
-              <MenuItem key={loc.id} value={String(loc.id)}>
-                {loc.name || loc.address || `Sede ${loc.id}`}
-              </MenuItem>
-            ))}
-          </TextField>
-        ) : (
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            No se encontraron sedes para la organización.
-          </Typography>
-        )}
-
-        {/* Availability picker */}
-        <AvailabilityPicker
-          value={formData.listAvailability}
-          onChange={(v) => handleSetField('listAvailability', v)}
-        />
-      </CreateFormDialog>
+      />
 
       <Tooltip title="Agregar servicio">
         <Fab

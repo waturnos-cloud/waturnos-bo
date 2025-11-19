@@ -3,11 +3,6 @@ import {
   Box,
   CircularProgress,
   Typography,
-  TextField,
-  InputAdornment,
-  Chip,
-  Switch,
-  FormControlLabel,
   Fab,
   Tooltip,
 } from "@mui/material";
@@ -21,19 +16,8 @@ import type { OrganizationDTO, CategoryDTO, ProviderDTO } from "../types/dto";
 import { useNotification } from "../contexts/NotificationContext";
 import { useNavigate } from "react-router-dom";
 import { useCRUDList, useForm, useLocationPicker } from "../hooks";
-import { CreateFormDialog, SelectableCardGrid, SearchAndFilter, LocationMarker, OrganizationDetailModal, ConfirmDialog } from "../components";
-import { MapContainer, TileLayer } from "react-leaflet";
-import "leaflet/dist/leaflet.css";
-import * as L from "leaflet";
-
-// Configure default Leaflet icon
-(L as any).Icon.Default.mergeOptions({
-  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-  iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-});
+import { SelectableCardGrid, SearchAndFilter, OrganizationDetailModal, ConfirmDialog, CreateOrganizationWizard } from "../components";
+import "../utils/leafletConfig";
 
 export default function DashOrganizations() {
   const navigate = useNavigate();
@@ -42,9 +26,7 @@ export default function DashOrganizations() {
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [categories, setCategories] = useState<CategoryDTO[]>([]);
-  const [subcategories, setSubcategories] = useState<CategoryDTO[]>([]);
   const [selectedCategory, setSelectedCategory] = useState("");
-  const [selectedSubcategory, setSelectedSubcategory] = useState("");
   const [editingOrg, setEditingOrg] = useState<OrganizationDTO | null>(null);
   const [detailOrg, setDetailOrg] = useState<any | null>(null);
   const [openDetailModal, setOpenDetailModal] = useState(false);
@@ -63,6 +45,8 @@ export default function DashOrganizations() {
     return (orgs as any[])
       .map((org) => ({
         ...org,
+        // Si type es un objeto, extraer solo el nombre del primer nivel
+        type: typeof org.type === 'object' && org.type?.name ? org.type.name : org.type,
         categoryType: org.simpleOrganization ? "simple" : "multi",
       }))
       .sort((a: any, b: any) =>
@@ -104,18 +88,7 @@ export default function DashOrganizations() {
       const json = await getCategories();
       setCategories(json.data ?? json ?? []);
     } catch (e) {
-      console.error("Error cargando categorías:", e);
-    }
-  };
-
-  const handleSelectCategory = async (parentId: string) => {
-    setSelectedCategory(parentId);
-    setSelectedSubcategory("");
-    try {
-      const json = await getCategoryChildren(parentId);
-      setSubcategories(json.data ?? json ?? []);
-    } catch (e) {
-      console.error("Error cargando subcategorías:", e);
+      console.error("Error cargando tipos:", e);
     }
   };
 
@@ -171,7 +144,12 @@ export default function DashOrganizations() {
       setLoadingDetail(true);
       setOpenDetailModal(true);
       const json = await getOrganization(org.id);
-      setDetailOrg(json.data ?? json);
+      const orgData = json.data ?? json;
+      // Transformar type a string si es un objeto
+      if (typeof orgData.type === 'object' && orgData.type?.name) {
+        orgData.type = orgData.type.name;
+      }
+      setDetailOrg(orgData);
     } catch (err) {
       console.error('Error cargando detalle:', err);
       notify('No se pudo cargar el detalle de la organización', 'error');
@@ -249,12 +227,12 @@ export default function DashOrganizations() {
           return;
         }
 
-        const categoryId = selectedSubcategory || selectedCategory;
         const payload = {
           organization: {
             name,
-            type,
-            categoryId,
+            type: {
+              id: Number(selectedCategory)
+            },
             logoUrl: logoUrl || null,
             simpleOrganization,
             locations: [
@@ -285,7 +263,6 @@ export default function DashOrganizations() {
       setOpenDialog(false);
       reset();
       setSelectedCategory("");
-      setSelectedSubcategory("");
       setEditingOrg(null);
       await reload();
     } catch (err) {
@@ -346,122 +323,19 @@ export default function DashOrganizations() {
         }
       />
 
-      <CreateFormDialog
+      <CreateOrganizationWizard
         open={openDialog}
-        title={editingOrg ? 'Editar organización' : 'Crear nueva organización'}
-        fields={[
-          { name: 'name', label: 'Nombre', required: true },
-          { name: 'logoUrl', label: 'Logo URL' },
-        ]}
-        formData={formData}
-        onFieldChange={(name, value) => handleChange({ target: { name, value } } as any)}
+        onClose={() => { setOpenDialog(false); reset(); setSelectedCategory(""); setEditingOrg(null); }}
         onSubmit={handleCreateOrganization}
-        onCancel={() => { setOpenDialog(false); reset(); setSelectedCategory(""); setSelectedSubcategory(""); setEditingOrg(null); }}
+        formData={formData}
+        onFieldChange={(name: string, value: any) => handleChange({ target: { name, value } } as any)}
+        categories={categories}
+        selectedCategory={selectedCategory}
+        onCategoryChange={setSelectedCategory}
+        location={location}
+        onLocationChange={updateCoordinates}
         loading={creating}
-      >
-        <Typography variant="subtitle2" fontWeight={600} sx={{ mt: 2, mb: 1 }}>Categoría</Typography>
-        <TextField
-          select
-          label="Categoría principal"
-          value={selectedCategory}
-          onChange={(e) => handleSelectCategory(e.target.value)}
-          SelectProps={{ native: true }}
-          fullWidth
-          margin="normal"
-          required
-        >
-          <option value=""></option>
-          {categories.map((cat) => (
-            <option key={cat.id} value={cat.id}>{cat.name}</option>
-          ))}
-        </TextField>
-
-        {selectedCategory && (
-          <TextField
-            select
-            label="Subcategoría"
-            value={selectedSubcategory}
-            onChange={(e) => setSelectedSubcategory(e.target.value)}
-            SelectProps={{ native: true }}
-            fullWidth
-            margin="normal"
-          >
-            <option value=""></option>
-            {subcategories.map((sub) => (
-              <option key={sub.id} value={sub.id}>{sub.name}</option>
-            ))}
-          </TextField>
-        )}
-
-        <FormControlLabel
-          control={
-            <Switch
-              checked={formData.simpleOrganization}
-              onChange={() => handleChange({ target: { name: 'simpleOrganization', value: !formData.simpleOrganization } } as any)}
-              color="primary"
-            />
-          }
-          label={formData.simpleOrganization ? "Organización Simple" : "Organización Multi"}
-          sx={{ mt: 2 }}
-        />
-
-        <Typography variant="subtitle2" fontWeight={600} sx={{ mt: 2, mb: 1 }}>Datos del Manager</Typography>
-        <TextField
-          label="Nombre completo"
-          name="managerFullName"
-          fullWidth
-          margin="normal"
-          value={formData.managerFullName}
-          onChange={handleChange}
-          required
-        />
-        <TextField
-          label="Email"
-          name="managerEmail"
-          fullWidth
-          margin="normal"
-          value={formData.managerEmail}
-          onChange={handleChange}
-          required
-        />
-        <TextField
-          label="Teléfono"
-          name="managerPhone"
-          fullWidth
-          margin="normal"
-          value={formData.managerPhone}
-          onChange={handleChange}
-          required
-        />
-
-        <Typography variant="subtitle2" fontWeight={600} sx={{ mt: 2, mb: 1 }}>Sede principal</Typography>
-        <TextField
-          label="Nombre de la sede"
-          name="locationName"
-          fullWidth
-          margin="normal"
-          value={formData.locationName}
-          onChange={handleChange}
-        />
-        <TextField
-          label="Dirección"
-          name="locationAddress"
-          fullWidth
-          margin="normal"
-          value={formData.locationAddress}
-          onChange={handleChange}
-        />
-
-        <Box sx={{ mt: 2, height: 260, borderRadius: 2, overflow: "hidden", border: "1px solid #eee" }}>
-          <MapContainer {...({ center: [location.lat, location.lng], zoom: 13, style: { height: "100%", width: "100%" } } as any)}>
-            <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-            <LocationMarker
-              position={{ lat: location.lat, lng: location.lng }}
-              onPositionChange={updateCoordinates}
-            />
-          </MapContainer>
-        </Box>
-      </CreateFormDialog>
+      />
 
       <ConfirmDialog
         open={confirmDialog.open}

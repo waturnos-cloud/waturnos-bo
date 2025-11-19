@@ -34,7 +34,7 @@ interface Location {
 interface OrganizationDetail {
   id: number;
   name: string;
-  type: string;
+  type: string | { id: number; name: string; children?: any[] };
   active: boolean;
   status: string;
   locations: Location[];
@@ -95,7 +95,11 @@ export default function OrganizationDetailModal({ open, onClose, organization, l
               <Typography variant="subtitle2" color="text.secondary" gutterBottom>
                 Tipo
               </Typography>
-              <Typography variant="body1">{organization.type || 'No especificado'}</Typography>
+              <Typography variant="body1">
+                {typeof organization.type === 'object' && organization.type?.name
+                  ? String(organization.type.name)
+                  : String(organization.type || 'No especificado')}
+              </Typography>
             </Box>
 
             <Divider />

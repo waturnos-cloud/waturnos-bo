@@ -4,7 +4,7 @@
  */
 import React, { useEffect } from 'react';
 import { Marker, useMapEvents } from 'react-leaflet';
-import * as L from 'leaflet';
+import L from '../utils/leafletConfig';
 import type { LatLngExpression, DragEndEvent, LeafletMouseEvent } from 'leaflet';
 
 export interface LocationMarkerProps {

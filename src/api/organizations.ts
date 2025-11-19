@@ -34,3 +34,18 @@ export async function toggleOrganizationStatus(orgId: number | string, status: '
   const { data } = await api.put(`/organizations/activate/${orgId}/${status}`);
   return data;
 }
+
+export async function getProvider(providerId: number | string) {
+  const { data } = await api.get(`/users/${providerId}`);
+  return data;
+}
+
+export async function updateProvider(body: any) {
+  const { data } = await api.put('/users', body);
+  return data;
+}
+
+export async function deleteProvider(providerId: number | string) {
+  const { data } = await api.delete(`/users/providers/${providerId}`);
+  return data;
+}

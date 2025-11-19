@@ -18,7 +18,6 @@ import ClientsPage from "./pages/ClientsPage";
 import BookingsPage from "./pages/BookingsPage";
 import DashOrganizations from "./pages/DashOrganizations";
 import DashProviders from "./pages/DashProviders";
-import UsersPage from "./pages/UsersPage";
 import React from 'react';
 const ServicesPage = React.lazy(() => import('./pages/ServicesPage'));
 
@@ -48,7 +47,7 @@ export default function App() {
               <Route
                 path="/dashboard-orgs"
                 element={
-                  <RoleProtectedRoute allowedRoles={["ADMIN"]}>
+                  <RoleProtectedRoute allowedRoles={["ADMIN","SELLER"]}>
                     <DashOrganizations />
                   </RoleProtectedRoute>
                 }
@@ -56,7 +55,7 @@ export default function App() {
               <Route
                 path="/dashboard-providers"
                 element={
-                  <RoleProtectedRoute allowedRoles={["ADMIN", "MANAGER"]}>
+                  <RoleProtectedRoute allowedRoles={["ADMIN","SELLER","MANAGER"]}>
                     <DashProviders />
                   </RoleProtectedRoute>
                 }
@@ -69,7 +68,7 @@ export default function App() {
               <Route
                 path="/clients"
                 element={
-                  <RoleProtectedRoute allowedRoles={["ADMIN", "MANAGER", "PROVIDER"]}>
+                  <RoleProtectedRoute allowedRoles={["ADMIN","SELLER", "MANAGER", "PROVIDER"]}>
                     <ClientsPage />
                   </RoleProtectedRoute>
                 }
@@ -78,7 +77,7 @@ export default function App() {
               <Route
                 path="/bookings"
                 element={
-                  <RoleProtectedRoute allowedRoles={["ADMIN", "MANAGER", "PROVIDER"]}>
+                  <RoleProtectedRoute allowedRoles={["ADMIN","SELLER", "MANAGER", "PROVIDER"]}>
                     <BookingsPage />
                   </RoleProtectedRoute>
                 }
@@ -87,7 +86,7 @@ export default function App() {
               <Route
                 path="/organization"
                 element={
-                  <RoleProtectedRoute allowedRoles={["ADMIN"]}>
+                  <RoleProtectedRoute allowedRoles={["ADMIN","SELLER"]}>
                     <DashOrganizations />
                   </RoleProtectedRoute>
                 }
@@ -96,8 +95,8 @@ export default function App() {
               <Route
                 path="/users"
                 element={
-                  <RoleProtectedRoute allowedRoles={["ADMIN", "MANAGER"]}>
-                    <UsersPage />
+                  <RoleProtectedRoute allowedRoles={["ADMIN","SELLER","MANAGER"]}>
+                    <div>Usuarios (CRUD)</div>
                   </RoleProtectedRoute>
                 }
               />
@@ -105,7 +104,7 @@ export default function App() {
               <Route
                 path="/services"
                 element={
-                  <RoleProtectedRoute allowedRoles={["ADMIN", "MANAGER"]}>
+                  <RoleProtectedRoute allowedRoles={["ADMIN","SELLER","MANAGER"]}>
                     <React.Suspense fallback={<div>Cargando...</div>}>
                       <ServicesPage />
                     </React.Suspense>

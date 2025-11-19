@@ -53,10 +53,27 @@ export default function Dashboard() {
     try {
       setLoading(true);
       const json = await getTodayByProvider(provId);
-      const list = (json.data ?? json ?? []) as Appointment[];
+      const services = (json.data ?? json ?? []) as any[];
 
-      if (list.length > 0) {
-        setTurnos(list);
+      // Aplanar la estructura: cada servicio tiene una lista de turnos
+      const flattened: Appointment[] = [];
+      services.forEach((svc) => {
+        const serviceName = svc.name || "";
+        const bookings = svc.list || [];
+        bookings.forEach((booking: any) => {
+          flattened.push({
+            id: booking.id,
+            startTime: booking.startTime,
+            endTime: booking.endTime,
+            status: booking.status,
+            clientName: booking.clientName || null,
+            serviceName: booking.serviceName || serviceName,
+          });
+        });
+      });
+
+      if (flattened.length > 0) {
+        setTurnos(flattened);
         setNextDayLabel(null);
       } else {
         // If today's endpoint returns no turnos, fetch the next 7 days and pick the next day that has bookings

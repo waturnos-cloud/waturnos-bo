@@ -10,7 +10,7 @@ interface Props {
   onChange?: (v: DayAvailability[]) => void;
 }
 
-const WEEK_DAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+const WEEK_DAYS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
 function ensureDays(v?: DayAvailability[]) {
   if (!v || v.length !== 7) {
@@ -64,7 +64,7 @@ export default function AvailabilityPicker({ value, onChange }: Props) {
           <Grid item xs={12} key={d.dayOfWeek}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
               <Switch checked={d.enabled} onChange={() => toggleDay(idx)} />
-              <Typography sx={{ width: 60 }}>{WEEK_DAYS[d.dayOfWeek]}</Typography>
+              <Typography sx={{ width: 60 }}>{WEEK_DAYS[idx]}</Typography>
               <Box sx={{ flex: 1 }}>
                 {d.enabled ? (
                   <Stack spacing={1}>

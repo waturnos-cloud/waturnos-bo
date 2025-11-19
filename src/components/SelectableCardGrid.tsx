@@ -16,7 +16,7 @@ export interface CardItem {
   avatarBg?: string;
   avatarInitial?: string;
   logoUrl?: string;
-  type?: string;
+  type?: string | any;
   active?: boolean;
   categoryType?: 'simple' | 'multi';
 }

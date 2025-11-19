@@ -27,6 +27,7 @@ import {
   Apartment as OrgIcon,
   Build as ServicesIcon,
   Person as UsersIcon,
+  Engineering as EngineeringIcon,
   Logout as LogoutIcon,
 } from "@mui/icons-material";
 import { useNavigate, Outlet, useLocation } from "react-router-dom";
@@ -48,14 +49,18 @@ export default function MainLayout() {
   const toggleMenu = () => setMenuOpen((prev) => !prev);
   const toggleMobileMenu = () => setMobileOpen((prev) => !prev);
 
+  const hasOrganization = !!localStorage.getItem("organizationId");
+  const hasProvider = !!localStorage.getItem("providerId");
+
   const menuItems = [
-    { label: "Dashboard", path: "/", icon: <DashboardIcon />, roles: ["ADMIN", "MANAGER", "PROVIDER"] },
-    { label: "Turnos", path: "/bookings", icon: <CalendarIcon />, roles: ["ADMIN", "MANAGER", "PROVIDER"] },
-    { label: "Clientes", path: "/clients", icon: <PeopleIcon />, roles: ["ADMIN", "MANAGER", "PROVIDER"] },
-    { label: "Servicios", path: "/services", icon: <ServicesIcon />, roles: ["ADMIN", "MANAGER"] },
-    { label: "Usuarios", path: "/users", icon: <UsersIcon />, roles: ["ADMIN", "MANAGER"] },
-    { label: "Organización", path: "/organization", icon: <OrgIcon />, roles: ["ADMIN"] },
-    { label: "Configuración", path: "/settings", icon: <SettingsIcon />, roles: ["ADMIN", "MANAGER", "PROVIDER"] },
+    { label: "Organizaciones", path: "/organization", icon: <OrgIcon />, roles: ["ADMIN", "SELLER"], requiresOrg: false, requiresProvider: false },
+    { label: "Proveedores", path: "/dashboard-providers", icon: <EngineeringIcon />, roles: ["ADMIN", "MANAGER", "PROVIDER"], requiresOrg: true, requiresProvider: false },
+    { label: "Dashboard", path: "/", icon: <DashboardIcon />, roles: ["ADMIN", "MANAGER", "PROVIDER"], requiresOrg: true, requiresProvider: true },
+    { label: "Turnos", path: "/bookings", icon: <CalendarIcon />, roles: ["ADMIN", "MANAGER", "PROVIDER"], requiresOrg: true, requiresProvider: true },
+    { label: "Servicios", path: "/services", icon: <ServicesIcon />, roles: ["ADMIN", "MANAGER"], requiresOrg: true, requiresProvider: true },
+    { label: "Usuarios", path: "/users", icon: <UsersIcon />, roles: ["ADMIN", "MANAGER"], requiresOrg: true, requiresProvider: true },
+    { label: "Clientes", path: "/clients", icon: <PeopleIcon />, roles: ["ADMIN", "MANAGER", "PROVIDER"], requiresOrg: true, requiresProvider: true },
+    { label: "Configuración", path: "/settings", icon: <SettingsIcon />, roles: ["ADMIN", "MANAGER", "PROVIDER"], requiresOrg: true, requiresProvider: true },
   ];
 
   const visibleItems = menuItems.filter((item) => item.roles.includes(role ?? ""));
@@ -100,39 +105,57 @@ export default function MainLayout() {
 
       {/* 🔹 Lista de navegación */}
       <List sx={{ flexGrow: 1, py: 1 }}>
-        {visibleItems.map((item) => (
-          <Tooltip title={!menuOpen ? item.label : ""} placement="right" key={item.path}>
-            <ListItem disablePadding>
-              <ListItemButton
-                onClick={() => {
-                  navigate(item.path);
-                  setMobileOpen(false);
-                }}
-                selected={location.pathname === item.path}
-                sx={{
-                  borderRadius: 1,
-                  mx: 1,
-                  my: 0.2,
-                  "&.Mui-selected": {
-                    bgcolor: "primary.light",
-                    color: "white",
-                    "& .MuiListItemIcon-root": { color: "white" },
-                  },
-                }}
-              >
-                <ListItemIcon
+        {visibleItems.map((item) => {
+          const isDisabled = (item.requiresOrg && !hasOrganization) || (item.requiresProvider && !hasProvider);
+          const tooltipText = !hasOrganization && item.requiresOrg 
+            ? "Selecciona una organización primero" 
+            : !hasProvider && item.requiresProvider 
+            ? "Selecciona un proveedor primero" 
+            : item.label;
+          return (
+            <Tooltip 
+              title={!menuOpen ? tooltipText : ""} 
+              placement="right" 
+              key={item.path}
+            >
+              <ListItem disablePadding>
+                <ListItemButton
+                  onClick={() => {
+                    if (!isDisabled) {
+                      navigate(item.path);
+                      setMobileOpen(false);
+                    }
+                  }}
+                  disabled={isDisabled}
+                  selected={location.pathname === item.path && !isDisabled}
                   sx={{
-                    color: "primary.main",
-                    minWidth: menuOpen ? 40 : 56,
+                    borderRadius: 1,
+                    mx: 1,
+                    my: 0.2,
+                    "&.Mui-selected": {
+                      bgcolor: "primary.light",
+                      color: "white",
+                      "& .MuiListItemIcon-root": { color: "white" },
+                    },
+                    "&.Mui-disabled": {
+                      opacity: 0.4,
+                    },
                   }}
                 >
-                  {item.icon}
-                </ListItemIcon>
-                {menuOpen && <ListItemText primary={item.label} />}
-              </ListItemButton>
-            </ListItem>
-          </Tooltip>
-        ))}
+                  <ListItemIcon
+                    sx={{
+                      color: isDisabled ? "text.disabled" : "primary.main",
+                      minWidth: menuOpen ? 40 : 56,
+                    }}
+                  >
+                    {item.icon}
+                  </ListItemIcon>
+                  {menuOpen && <ListItemText primary={item.label} />}
+                </ListItemButton>
+              </ListItem>
+            </Tooltip>
+          );
+        })}
       </List>
 
       {/* 🔹 Info de rol */}

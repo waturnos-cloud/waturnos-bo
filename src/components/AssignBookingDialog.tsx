@@ -22,10 +22,10 @@ export default function AssignBookingDialog({ open, onClose, serviceId }: Props)
 
     const payload: BookingDTO = {
       serviceId,
-      clientId: clientId as number,
-      startTime: startISO.toISOString(),
-      endTime: endISO.toISOString(),
-      status: 'CONFIRMED'
+      clientId: 0,
+    startTime: new Date().toISOString(),
+    endTime: new Date().toISOString(),
+    status: 'RESERVED'
     };
     await createBookings([payload]);
     onClose();

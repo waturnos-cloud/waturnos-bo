@@ -8,12 +8,13 @@ import {
 } from "@mui/material";
 import { Add as AddFabIcon } from "@mui/icons-material";
 import React from 'react';
-import { getProvidersByOrg, createProvider } from "../api/organizations";
+import { getProvidersByOrg, createProvider, getProvider, updateProvider, deleteProvider } from "../api/organizations";
 import { useNotification } from "../contexts/NotificationContext";
 import { useNavigate } from "react-router-dom";
 import type { ProviderDTO } from "../types/dto";
 import { useCRUDList, useForm } from "../hooks";
-import { CreateFormDialog, SelectableCardGrid } from "../components";
+import { CreateFormDialog, SelectableCardGrid, ConfirmDialog, ProviderDetailModal } from "../components";
+import { useState } from "react";
 
 const PROVIDER_FORM_FIELDS = [
   { name: 'fullName', label: 'Nombre completo', required: true },
@@ -28,6 +29,15 @@ export default function DashProviders(): JSX.Element {
   const { notify } = useNotification();
   const navigate = useNavigate();
   const [openDialog, setOpenDialog] = React.useState(false);
+  const [editingProvider, setEditingProvider] = React.useState<ProviderDTO | null>(null);
+  const [detailProvider, setDetailProvider] = React.useState<any | null>(null);
+  const [openDetailModal, setOpenDetailModal] = React.useState(false);
+  const [loadingDetail, setLoadingDetail] = React.useState(false);
+  const [confirmDialog, setConfirmDialog] = React.useState<{
+    open: boolean;
+    provider: ProviderDTO | null;
+  }>({ open: false, provider: null });
+  const [processingDelete, setProcessingDelete] = React.useState(false);
 
   const { formData, handleChange, reset } = useForm({
     fullName: "",
@@ -51,6 +61,64 @@ export default function DashProviders(): JSX.Element {
     if (orgId) reload();
   }, [orgId, reload]);
 
+  const handleViewDetail = async (prov: ProviderDTO) => {
+    if (!prov.id) return;
+    try {
+      setLoadingDetail(true);
+      setOpenDetailModal(true);
+      const json = await getProvider(prov.id);
+      setDetailProvider(json.data ?? json);
+    } catch (err) {
+      console.error('Error cargando detalle:', err);
+      notify('No se pudo cargar el detalle del proveedor', 'error');
+      setOpenDetailModal(false);
+    } finally {
+      setLoadingDetail(false);
+    }
+  };
+
+  const handleEdit = async (prov: ProviderDTO) => {
+    if (!prov.id) return;
+    try {
+      setLoadingDetail(true);
+      const json = await getProvider(prov.id);
+      const fullProv = json.data ?? json;
+      setEditingProvider(fullProv);
+      handleChange({ target: { name: 'fullName', value: fullProv.fullName || '' } } as any);
+      handleChange({ target: { name: 'email', value: fullProv.email || '' } } as any);
+      handleChange({ target: { name: 'phone', value: fullProv.phone || '' } } as any);
+      handleChange({ target: { name: 'bio', value: fullProv.bio || '' } } as any);
+      handleChange({ target: { name: 'fotoUrl', value: fullProv.photoUrl || fullProv.fotoUrl || '' } } as any);
+      setOpenDialog(true);
+    } catch (err) {
+      console.error('Error cargando proveedor:', err);
+      notify('No se pudo cargar el proveedor', 'error');
+    } finally {
+      setLoadingDetail(false);
+    }
+  };
+
+  const handleDelete = (prov: ProviderDTO) => {
+    setConfirmDialog({ open: true, provider: prov });
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!confirmDialog.provider?.id) return;
+
+    try {
+      setProcessingDelete(true);
+      await deleteProvider(confirmDialog.provider.id);
+      notify('Proveedor eliminado con éxito', 'success');
+      setConfirmDialog({ open: false, provider: null });
+      await reload();
+    } catch (err) {
+      console.error('Error eliminando proveedor:', err);
+      notify('No se pudo eliminar el proveedor', 'error');
+    } finally {
+      setProcessingDelete(false);
+    }
+  };
+
   const handleSelect = (prov: ProviderDTO) => {
     try {
       if (prov.id) localStorage.setItem("providerId", String(prov.id));
@@ -69,8 +137,6 @@ export default function DashProviders(): JSX.Element {
 
   const handleCreateProvider = async () => {
     try {
-      if (!orgId) return;
-
       const { fullName, email, phone, bio } = formData;
       if (!fullName || !email || !phone || !bio) {
         notify("Por favor completá todos los campos obligatorios.", "warning");
@@ -78,18 +144,38 @@ export default function DashProviders(): JSX.Element {
       }
 
       setCreating(true);
-      const json = await createProvider(orgId, formData);
-      const provider = json.data ?? json;
 
-      if (provider?.id) {
-        notify(`Proveedor ${provider.fullName} creado con éxito.`, "success");
-        setOpenDialog(false);
-        reset();
-        await reload();
+      if (editingProvider) {
+        // Modo edición
+        const updatePayload = {
+          id: editingProvider.id,
+          fullName,
+          email,
+          phone,
+          bio,
+          photoUrl: formData.fotoUrl || null,
+        };
+        await updateProvider(updatePayload);
+        notify(`Proveedor ${fullName} actualizado con éxito.`, "success");
+      } else {
+        // Modo creación
+        if (!orgId) {
+          notify("No se encontró la organización.", "error");
+          setCreating(false);
+          return;
+        }
+        const json = await createProvider(orgId, formData);
+        const provider = json.data ?? json;
+        notify(`Proveedor ${provider.fullName || fullName} creado con éxito.`, "success");
       }
+
+      setOpenDialog(false);
+      reset();
+      setEditingProvider(null);
+      await reload();
     } catch (err) {
-      console.error("Error al crear proveedor:", err);
-      notify("No se pudo crear el proveedor.", "error");
+      console.error("Error al guardar proveedor:", err);
+      notify("No se pudo guardar el proveedor.", "error");
     } finally {
       setCreating(false);
     }
@@ -112,6 +198,9 @@ export default function DashProviders(): JSX.Element {
         items={providers}
         onSelect={handleSelect}
         onCreate={() => setOpenDialog(true)}
+        onView={handleViewDetail}
+        onEdit={handleEdit}
+        onDelete={handleDelete}
         renderContent={(prov) => (
           <Typography variant="body2" color="text.secondary">
             {prov.bio || prov.email}
@@ -126,13 +215,32 @@ export default function DashProviders(): JSX.Element {
 
       <CreateFormDialog
         open={openDialog}
-        title="Crear nuevo proveedor"
+        title={editingProvider ? 'Editar proveedor' : 'Crear nuevo proveedor'}
         fields={PROVIDER_FORM_FIELDS}
         formData={formData}
         onFieldChange={(name, value) => handleChange({ target: { name, value } } as any)}
         onSubmit={handleCreateProvider}
-        onCancel={() => { setOpenDialog(false); reset(); }}
+        onCancel={() => { setOpenDialog(false); reset(); setEditingProvider(null); }}
         loading={creating}
+      />
+
+      <ProviderDetailModal
+        open={openDetailModal}
+        onClose={() => { setOpenDetailModal(false); setDetailProvider(null); }}
+        provider={detailProvider}
+        loading={loadingDetail}
+      />
+
+      <ConfirmDialog
+        open={confirmDialog.open}
+        title="Eliminar proveedor"
+        message={`¿Estás seguro de eliminar a "${confirmDialog.provider?.fullName}"? Esta acción no se puede deshacer.`}
+        confirmText="Eliminar"
+        cancelText="Cancelar"
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setConfirmDialog({ open: false, provider: null })}
+        severity="error"
+        loading={processingDelete}
       />
 
       <Tooltip title="Agregar proveedor">

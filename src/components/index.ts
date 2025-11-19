@@ -22,3 +22,9 @@ export type { CreateClientModalProps } from './CreateClientModal';
 export { default as OrganizationDetailModal } from './OrganizationDetailModal';
 
 export { default as ConfirmDialog } from './ConfirmDialog';
+
+export { default as ProviderDetailModal } from './ProviderDetailModal';
+
+export { default as CreateOrganizationWizard } from './CreateOrganizationWizard';
+
+export { default as CreateServiceWizard } from './CreateServiceWizard';
