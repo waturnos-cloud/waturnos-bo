@@ -107,7 +107,7 @@ export default function App() {
               <Route
                 path="/services"
                 element={
-                  <RoleProtectedRoute allowedRoles={["ADMIN","SELLER","MANAGER"]}>
+                  <RoleProtectedRoute allowedRoles={["ADMIN","SELLER","MANAGER","PROVIDER"]}>
                     <React.Suspense fallback={<div>Cargando...</div>}>
                       <ServicesPage />
                     </React.Suspense>
