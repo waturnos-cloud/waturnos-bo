@@ -265,9 +265,10 @@ export default function DashOrganizations() {
       setSelectedCategory("");
       setEditingOrg(null);
       await reload();
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error al guardar organización:", err);
-      notify("No se pudo guardar la organización.", "error");
+      const errorMessage = err?.response?.data?.message || err?.message || "No se pudo guardar la organización.";
+      notify(errorMessage, "error");
     } finally {
       setCreating(false);
     }

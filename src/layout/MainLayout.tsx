@@ -57,7 +57,7 @@ export default function MainLayout() {
     { label: "Proveedores", path: "/dashboard-providers", icon: <EngineeringIcon />, roles: ["ADMIN", "MANAGER", "PROVIDER"], requiresOrg: true, requiresProvider: false },
     { label: "Dashboard", path: "/", icon: <DashboardIcon />, roles: ["ADMIN", "MANAGER", "PROVIDER"], requiresOrg: true, requiresProvider: true },
     { label: "Turnos", path: "/bookings", icon: <CalendarIcon />, roles: ["ADMIN", "MANAGER", "PROVIDER"], requiresOrg: true, requiresProvider: true },
-    { label: "Servicios", path: "/services", icon: <ServicesIcon />, roles: ["ADMIN", "MANAGER"], requiresOrg: true, requiresProvider: true },
+    { label: "Servicios", path: "/services", icon: <ServicesIcon />, roles: ["ADMIN", "MANAGER", "PROVIDER"], requiresOrg: true, requiresProvider: true },
     { label: "Usuarios", path: "/users", icon: <UsersIcon />, roles: ["ADMIN", "MANAGER"], requiresOrg: true, requiresProvider: true },
     { label: "Clientes", path: "/clients", icon: <PeopleIcon />, roles: ["ADMIN", "MANAGER", "PROVIDER"], requiresOrg: true, requiresProvider: true },
     { label: "Configuración", path: "/settings", icon: <SettingsIcon />, roles: ["ADMIN", "MANAGER", "PROVIDER"], requiresOrg: true, requiresProvider: true },

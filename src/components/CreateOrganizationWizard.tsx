@@ -332,10 +332,6 @@ export default function CreateOrganizationWizard({
         {/* Paso 1: Información Básica */}
         <Slide direction={slideDirection} in={activeStep === 0} mountOnEnter unmountOnExit>
           <Box sx={{ position: 'absolute', width: 'calc(100% - 48px)' }}>
-            <Typography variant="h6" fontWeight={600} sx={{ mb: 3, color: 'primary.main' }}>
-              Información Básica
-            </Typography>
-
             <TextField
               label="Nombre de la Organización"
               name="name"
@@ -427,10 +423,6 @@ export default function CreateOrganizationWizard({
         {/* Paso 2: Datos del Manager */}
         <Slide direction={slideDirection} in={activeStep === 1} mountOnEnter unmountOnExit>
           <Box sx={{ position: 'absolute', width: 'calc(100% - 48px)', minHeight: 450 }}>
-            <Typography variant="h6" fontWeight={600} sx={{ mb: 3, color: 'primary.main' }}>
-              Datos del Manager
-            </Typography>
-
             <TextField
               label="Nombre Completo"
               name="managerFullName"
@@ -475,27 +467,15 @@ export default function CreateOrganizationWizard({
               required
             />
 
-            <TextField
-              label="Contraseña"
-              name="managerPassword"
-              type="password"
-              fullWidth
-              margin="normal"
-              value={formData.managerPassword}
-              onChange={(e) => onFieldChange('managerPassword', e.target.value)}
-              helperText="La contraseña por defecto es 12345"
-              disabled
-            />
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 2, fontStyle: 'italic' }}>
+              Se generará una contraseña automáticamente y se enviará por email al manager.
+            </Typography>
           </Box>
         </Slide>
 
         {/* Paso 3: Ubicación */}
         <Slide direction={slideDirection} in={activeStep === 2} mountOnEnter unmountOnExit>
           <Box sx={{ position: 'absolute', width: 'calc(100% - 48px)' }}>
-            <Typography variant="h6" fontWeight={600} sx={{ mb: 3, color: 'primary.main' }}>
-              Ubicación de la Sede Principal
-            </Typography>
-
             <TextField
               label="Nombre de la Sede"
               name="locationName"
