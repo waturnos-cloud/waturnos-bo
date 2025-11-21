@@ -64,3 +64,9 @@ export interface CategoryDTO {
   name: string;
   parentId?: number | null;
 }
+
+export interface LockCalendarDTO {
+  startTime: string;
+  endTime: string;
+  serviceId: number;
+}

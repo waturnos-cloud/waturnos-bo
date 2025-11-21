@@ -24,3 +24,8 @@ export async function deleteService(serviceId: number | string) {
   const { data } = await api.delete(`/services/${serviceId}`);
   return data;
 }
+
+export async function lockCalendar(body: { startTime: string; endTime: string; serviceId: number }) {
+  const { data } = await api.post('/services/calendar/lock', body);
+  return data;
+}

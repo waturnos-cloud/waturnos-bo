@@ -28,3 +28,5 @@ export { default as ProviderDetailModal } from './ProviderDetailModal';
 export { default as CreateOrganizationWizard } from './CreateOrganizationWizard';
 
 export { default as CreateServiceWizard } from './CreateServiceWizard';
+
+export { default as LockCalendarModal } from './LockCalendarModal';

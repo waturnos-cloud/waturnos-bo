@@ -8,7 +8,8 @@ import { getClients, createClient } from "../api/clients";
 import type { ClientDTO } from "../types/dto";
 import type { Appointment } from "../types/types";
 import DayOccupancyCard from "../components/DayOccupancyCard";
-import { AssignBookingModal, CreateClientModal } from "../components";
+import { AssignBookingModal, CreateClientModal, LockCalendarModal } from "../components";
+import { lockCalendar, getServicesByUser } from "../api/services";
 import {
   Grid,
   Box,
@@ -32,7 +33,7 @@ import EventAvailableIcon from "@mui/icons-material/EventAvailable";
 import DoNotDisturbIcon from "@mui/icons-material/DoNotDisturb";
 
 export default function Dashboard() {
-  const { providerId, role } = useAuth();
+  const { providerId, role, userId } = useAuth();
   const { notify } = useNotification();
   const navigate = useNavigate();
 
@@ -40,11 +41,14 @@ export default function Dashboard() {
   const [turnos, setTurnos] = useState<Appointment[]>([]);
   const [nextDayLabel, setNextDayLabel] = useState<string | null>(null);
   const [clients, setClients] = useState<ClientDTO[]>([]);
+  const [services, setServices] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [openAssignModal, setOpenAssignModal] = useState(false);
   const [createClientOpen, setCreateClientOpen] = useState(false);
   const [assignLoading, setAssignLoading] = useState(false);
   const [clientLoading, setClientLoading] = useState(false);
+  const [openLockModal, setOpenLockModal] = useState(false);
+  const [lockLoading, setLockLoading] = useState(false);
 
   const organizationName = localStorage.getItem("organizationName");
   const providerName = localStorage.getItem("providerName");
@@ -149,6 +153,18 @@ export default function Dashboard() {
     }
   };
 
+  const loadServices = async () => {
+    try {
+      const id = providerId ?? userId;
+      if (!id) return;
+      
+      const json = await getServicesByUser(id);
+      setServices(json.data ?? json ?? []);
+    } catch (err) {
+      console.error("Error cargando servicios:", err);
+    }
+  };
+
   // -------------------------------------------------
   // Asignar turno
   // -------------------------------------------------
@@ -193,14 +209,42 @@ export default function Dashboard() {
   };
 
   // -------------------------------------------------
+  // Bloquear calendario
+  // -------------------------------------------------
+  const handleLockCalendar = async (startTime: string, endTime: string, serviceId: number) => {
+    try {
+      setLockLoading(true);
+
+      await lockCalendar({
+        startTime,
+        endTime,
+        serviceId
+      });
+
+      notify("Agenda bloqueada correctamente", "success");
+      setOpenLockModal(false);
+
+      // Recargar turnos después de bloquear
+      if (providerId) loadTurnos(providerId);
+    } catch (err: any) {
+      console.error("Error bloqueando agenda:", err);
+      const errorMessage = err?.response?.data?.message || err?.message || "No se pudo bloquear la agenda";
+      notify(errorMessage, "error");
+    } finally {
+      setLockLoading(false);
+    }
+  };
+
+  // -------------------------------------------------
   // Cargar datos al montar
   // -------------------------------------------------
   useEffect(() => {
     if (providerId) {
       loadTurnos(providerId);
       loadClients();
+      loadServices();
     }
-  }, [providerId]);
+  }, [providerId, userId]);
 
   // -------------------------------------------------
   // Cambiar organización
@@ -435,7 +479,7 @@ export default function Dashboard() {
               Asignar Turno
             </Button>
 
-            <Button variant="outlined" startIcon={<BlockIcon />} fullWidth size="large">
+            <Button variant="outlined" startIcon={<BlockIcon />} fullWidth size="large" onClick={() => setOpenLockModal(true)}>
               Bloquear Agenda
             </Button>
           </Stack>
@@ -482,6 +526,15 @@ export default function Dashboard() {
         onClose={() => setCreateClientOpen(false)}
         onSubmit={handleCreateClient}
         loading={clientLoading}
+      />
+
+      {/* MODAL BLOQUEAR AGENDA */}
+      <LockCalendarModal
+        open={openLockModal}
+        onClose={() => setOpenLockModal(false)}
+        onSubmit={handleLockCalendar}
+        loading={lockLoading}
+        services={services.map(s => ({ id: s.id, name: s.name }))}
       />
 
       {/* Notification handled by NotificationProvider */}
