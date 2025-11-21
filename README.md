@@ -5,6 +5,7 @@ Implementado con **React + Vite**, **Material UI**, **React Router**, **Axios co
 
 ---
 
+
 # 📦 Requisitos
 
 - **Node.js 18+**
