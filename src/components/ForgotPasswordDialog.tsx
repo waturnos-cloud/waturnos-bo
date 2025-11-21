@@ -62,7 +62,7 @@ export default function ForgotPasswordDialog({ open, onClose }: ForgotPasswordDi
       <DialogTitle>Recuperar contraseña</DialogTitle>
       <DialogContent>
         <Typography sx={{ mb: 2 }}>
-          Ingresá tu email para recibir instrucciones de recuperación.
+          Ingresá tu email para recibir las instrucciones de recuperación.
         </Typography>
         <form onSubmit={handleSubmit}>
           <TextField
