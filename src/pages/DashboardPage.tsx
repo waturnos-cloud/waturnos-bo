@@ -32,7 +32,7 @@ import EventAvailableIcon from "@mui/icons-material/EventAvailable";
 import DoNotDisturbIcon from "@mui/icons-material/DoNotDisturb";
 
 export default function Dashboard() {
-  const { providerId } = useAuth();
+  const { providerId, role } = useAuth();
   const { notify } = useNotification();
   const navigate = useNavigate();
 
@@ -391,9 +391,11 @@ export default function Dashboard() {
           </Box>
 
           {/* Derecha */}
-          <Button variant="outlined" size="small" onClick={handleChangeOrganization}>
-            Cambiar
-          </Button>
+          {role === "ADMIN" && (
+            <Button variant="outlined" size="small" onClick={handleChangeOrganization}>
+              Cambiar
+            </Button>
+          )}
         </Box>
       </Card>
 

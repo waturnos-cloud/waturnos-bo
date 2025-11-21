@@ -2,6 +2,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { login } from "../api/auth";
+import { getOrganization } from "../api/organizations";
 import type { LoginRequest } from "../types/dto";
 
 type Ctx = {
@@ -56,6 +57,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setRole(res.role);
       setOrganizationId(res.organizationId);
       setProviderId(res.providerId);
+
+      // 📦 Si tiene organizationId, cargar datos de la organización
+      if (res.organizationId) {
+        try {
+          const orgJson = await getOrganization(res.organizationId);
+          const org = orgJson.data ?? orgJson;
+          if (org.name) localStorage.setItem("organizationName", org.name);
+          if (org.logoUrl) localStorage.setItem("organizationLogo", org.logoUrl);
+          if (org.simpleOrganization !== undefined) {
+            localStorage.setItem("organizationType", org.simpleOrganization ? "simple" : "multi");
+          }
+        } catch (error) {
+          console.error("Error cargando datos de organización:", error);
+        }
+      }
 
       // 🚀 Redirigir según el rol
       redirectAfterLogin(res.role, res.organizationId, res.providerId);

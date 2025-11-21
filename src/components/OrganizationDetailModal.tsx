@@ -57,7 +57,10 @@ export default function OrganizationDetailModal({ open, onClose, organization, l
       <DialogTitle>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           {organization?.logoUrl ? (
-            <Avatar src={organization.logoUrl} sx={{ width: 56, height: 56 }} />
+            <Avatar 
+              src={organization.logoUrl.startsWith('http') ? organization.logoUrl : `/images/${organization.logoUrl.replace(/^\/images\//, '')}`} 
+              sx={{ width: 56, height: 56 }} 
+            />
           ) : (
             <Avatar sx={{ width: 56, height: 56, bgcolor: 'primary.main' }}>
               {organization?.name?.charAt(0).toUpperCase()}

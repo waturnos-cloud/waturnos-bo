@@ -18,8 +18,11 @@ import {
   Slide,
   IconButton,
   InputAdornment,
+  Avatar,
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import { uploadFile, fileToBase64 } from '../api/upload';
 import { MapContainer, TileLayer, useMap } from 'react-leaflet';
 import { LocationMarker } from './LocationMarker';
 import '../utils/leafletConfig';
@@ -88,6 +91,9 @@ export default function CreateOrganizationWizard({
   const [searchingAddress, setSearchingAddress] = useState(false);
   const [emailError, setEmailError] = useState('');
   const [phoneError, setPhoneError] = useState('');
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   // Validador de email
   const validateEmail = (email: string): boolean => {
@@ -118,6 +124,44 @@ export default function CreateOrganizationWizard({
     }
     setPhoneError('');
     return true;
+  };
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validar tipo de archivo
+    if (!file.type.startsWith('image/')) {
+      alert('Por favor selecciona un archivo de imagen válido');
+      return;
+    }
+
+    // Validar tamaño (máximo 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      alert('El archivo es muy grande. Tamaño máximo: 2MB');
+      return;
+    }
+
+    setUploadingLogo(true);
+    try {
+      // Convertir a Base64 para preview inmediato
+      const base64 = await fileToBase64(file);
+      setLogoPreview(base64);
+      
+      // Subir archivo al backend
+      const logoUrl = await uploadFile(file);
+      
+      // Guardar la URL completa que retorna el backend
+      onFieldChange('logoUrl', logoUrl);
+      
+      console.log('✅ Imagen subida exitosamente:', logoUrl);
+    } catch (error) {
+      console.error('Error subiendo logo:', error);
+      alert('No se pudo subir el logo. Por favor intenta de nuevo.');
+      setLogoPreview(null);
+    } finally {
+      setUploadingLogo(false);
+    }
   };
 
   const handleSearchAddress = async () => {
@@ -173,6 +217,10 @@ export default function CreateOrganizationWizard({
     setActiveStep(0);
     setEmailError('');
     setPhoneError('');
+    setLogoPreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
     onClose();
   };
 
@@ -299,15 +347,39 @@ export default function CreateOrganizationWizard({
               autoFocus
             />
 
-            <TextField
-              label="URL del Logo"
-              name="logoUrl"
-              fullWidth
-              margin="normal"
-              value={formData.logoUrl}
-              onChange={(e) => onFieldChange('logoUrl', e.target.value)}
-              helperText="URL de la imagen del logo (opcional)"
-            />
+            <Box sx={{ mt: 2, mb: 2 }}>
+              <Typography variant="body2" color="text.secondary" gutterBottom>
+                Logo de la Organización (opcional)
+              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 1 }}>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  style={{ display: 'none' }}
+                  onChange={handleFileChange}
+                />
+                <Button
+                  variant="outlined"
+                  component="span"
+                  startIcon={uploadingLogo ? <CircularProgress size={20} /> : <CloudUploadIcon />}
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadingLogo}
+                >
+                  {uploadingLogo ? 'Subiendo...' : 'Seleccionar Logo'}
+                </Button>
+                {(logoPreview || formData.logoUrl) && (
+                  <Avatar
+                    src={logoPreview || formData.logoUrl}
+                    alt="Preview del logo"
+                    sx={{ width: 56, height: 56, border: '2px solid #e0e0e0' }}
+                  />
+                )}
+              </Box>
+              <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                Formatos aceptados: JPG, PNG, GIF. Tamaño máximo: 2MB
+              </Typography>
+            </Box>
 
             <TextField
               select

@@ -8,6 +8,8 @@ export type LoginResponse = {
   role: string;
   organizationId?: number;
   providerId?: number;
+  organizationName?: string;
+  organizationLogo?: string;
 };
 
 export async function login(body: LoginRequest): Promise<LoginResponse> {
@@ -25,11 +27,13 @@ export async function login(body: LoginRequest): Promise<LoginResponse> {
   const role = json?.role ?? json?.data?.role;
   const organizationId = json?.organizationId ?? json?.data?.organizationId;
   const providerId = json?.providerId ?? json?.data?.providerId;
+  const organizationName = json?.organizationName ?? json?.data?.organizationName;
+  const organizationLogo = json?.organizationLogo ?? json?.data?.organizationLogo;
 
   if (!token || !userId) {
     console.error("⚠️ Respuesta inesperada del backend:", json);
     throw new Error("No recibí los datos esperados del backend (token o userId faltantes)");
   }
 
-  return { token, userId, role, organizationId, providerId };
+  return { token, userId, role, organizationId, providerId, organizationName, organizationLogo };
 }

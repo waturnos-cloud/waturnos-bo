@@ -120,13 +120,18 @@ export function SelectableCardGrid<T extends CardItem>({
                   {item.logoUrl ? (
                     <Box
                       component="img"
-                      src={item.logoUrl}
+                      src={item.logoUrl.startsWith('http') ? item.logoUrl : `/images/${item.logoUrl.replace(/^\/images\//, '')}`}
                       alt={item.name}
+                      onError={(e) => {
+                        console.error('Error cargando imagen:', item.logoUrl);
+                        (e.target as HTMLImageElement).style.display = 'none';
+                      }}
                       sx={{
                         width: 64,
                         height: 64,
-                        objectFit: 'contain',
+                        objectFit: 'cover',
                         borderRadius: 2,
+                        border: '1px solid #e0e0e0',
                       }}
                     />
                   ) : (
