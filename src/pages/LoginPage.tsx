@@ -1,4 +1,5 @@
 import { useState } from "react";
+import ForgotPasswordDialog from "../components/ForgotPasswordDialog";
 import {
   Box,
   Button,
@@ -25,6 +26,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const [forgotOpen, setForgotOpen] = useState(false);
 
   const validate = () => {
     const newErrors: typeof errors = {};
@@ -177,6 +179,7 @@ export default function LoginPage() {
               href="#"
               underline="hover"
               sx={{ fontSize: 14, color: "primary.main", fontWeight: 500 }}
+              onClick={e => { e.preventDefault(); setForgotOpen(true); }}
             >
               ¿Olvidaste tu contraseña?
             </Link>
@@ -195,6 +198,7 @@ export default function LoginPage() {
           </Typography>
         </CardContent>
       </Card>
+    <ForgotPasswordDialog open={forgotOpen} onClose={() => setForgotOpen(false)} />
     </Box>
   );
 }
