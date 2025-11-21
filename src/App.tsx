@@ -20,6 +20,7 @@ import DashOrganizations from "./pages/DashOrganizations";
 import DashProviders from "./pages/DashProviders";
 import React from 'react';
 const ServicesPage = React.lazy(() => import('./pages/ServicesPage'));
+import ResetPasswordPage from "./pages/ResetPasswordPage";
 
 // 🎨 Tema global (Material UI + español)
 const theme = createTheme(baseTheme, coreEsES, gridEsES);
@@ -34,6 +35,8 @@ export default function App() {
           <Routes>
             {/* Página pública */}
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/user/resetpassword.html/resetpassword.html" element={<React.Suspense fallback={<div>Cargando...</div>}><ResetPasswordPage /></React.Suspense>} />
+            <Route path="/user/resetpassword.html" element={<React.Suspense fallback={<div>Cargando...</div>}><ResetPasswordPage /></React.Suspense>} />
 
             {/* 🔒 Todo lo autenticado va dentro de MainLayout */}
             <Route
