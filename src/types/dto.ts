@@ -7,6 +7,7 @@ export interface LoginResponse { token: string; user?: any; }
 export interface ClientDTO {
   id?: number;
   fullName: string;
+  dni?: string | null;
   email?: string | null;
   phone?: string | null;
   active?: boolean;

@@ -32,13 +32,30 @@ export async function linkClientToOrganization(clientId: number, organizationId:
   return data;
 }
 
+export async function unlinkClientFromOrganization(clientId: number, organizationId: number) {
+  const { data } = await api.delete(`/clients/${clientId}/${organizationId}`);
+  return data;
+}
+
+export interface ClientNotificationDTO {
+  language: string;
+  subject: string;
+  message: string;
+  organizationId: number;
+}
+
+export async function notifyClient(clientId: number, body: ClientNotificationDTO) {
+  const { data } = await api.post(`/clients/${clientId}/notify`, body);
+  return data;
+}
+
 export async function createClient(body: ClientDTO) {
   const { data } = await api.post('/clients', body);
   return data;
 }
 
-export async function updateClient(id: number, body: ClientDTO) {
-  const { data } = await api.put(`/clients/${id}`, body);
+export async function updateClient(body: ClientDTO) {
+  const { data } = await api.put(`/clients`, body);
   return data;
 }
 

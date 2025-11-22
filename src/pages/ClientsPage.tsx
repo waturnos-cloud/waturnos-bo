@@ -1,8 +1,12 @@
 
 import { useEffect, useState } from 'react';
 import { Box, Button, Card, CardContent, CircularProgress, TextField, Typography, Table, TableBody, TableCell, TableHead, TableRow, Dialog, DialogTitle, DialogContent, DialogActions, Alert, Snackbar } from '@mui/material';
+import { IconButton } from '@mui/material';
+import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
 import AppBarTop from '../components/AppBarTop';
-import { getClientsByOrganization, searchClients, findClientBy, createClient, linkClientToOrganization } from '../api/clients';
+import { getClientsByOrganization, searchClients, findClientBy, createClient, linkClientToOrganization, updateClient, unlinkClientFromOrganization, notifyClient } from '../api/clients';
 import { useAuth } from '../auth/AuthContext';
 import type { ClientDTO } from '../types/dto';
 
@@ -20,6 +24,16 @@ export default function ClientsPage() {
   const [addLoading, setAddLoading] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
   const [createForm, setCreateForm] = useState({ fullName: '', email: '', phone: '', password: '', dni: '' });
+  // edit client state
+  const [openEdit, setOpenEdit] = useState(false);
+  const [editingClientId, setEditingClientId] = useState<number | null>(null);
+  // delete / notify state
+  const [openDelete, setOpenDelete] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<ClientDTO | null>(null);
+  const [openNotify, setOpenNotify] = useState(false);
+  const [notifyTarget, setNotifyTarget] = useState<ClientDTO | null>(null);
+  const [notifyMessage, setNotifyMessage] = useState('');
+  const [notifySubject, setNotifySubject] = useState('');
   // snackbar
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMsg, setSnackbarMsg] = useState('');
@@ -132,6 +146,27 @@ export default function ClientsPage() {
 
   const handleCreateAndLink = async () => {
     if (!organizationId) { setAddError('No hay organización seleccionada'); return; }
+    // Validaciones
+    const nameRegex = /^[A-Za-zÁÉÍÓÚáéíóúÑñ ]+$/;
+    const phoneRegex = /^\d+$/;
+    const dniRegex = /^\d+$/;
+    const emailRegex = /^\S+@\S+\.\S+$/;
+    if (!createForm.fullName || !nameRegex.test(createForm.fullName)) {
+      setAddError('El nombre debe ser solo letras y espacios');
+      return;
+    }
+    if (!createForm.phone || !phoneRegex.test(createForm.phone)) {
+      setAddError('El teléfono debe ser solo números');
+      return;
+    }
+    if (!createForm.dni || !dniRegex.test(createForm.dni)) {
+      setAddError('El DNI debe ser solo números');
+      return;
+    }
+    if (!createForm.email || !emailRegex.test(createForm.email)) {
+      setAddError('El email no es válido');
+      return;
+    }
     setAddLoading(true);
     setAddError(null);
     try {
@@ -147,6 +182,57 @@ export default function ClientsPage() {
       const serverMsg = e?.response?.data?.message || e?.message;
       setAddError(serverMsg || 'Error al crear/vincular cliente');
       showSnackbar(serverMsg || 'Error al crear/vincular cliente', 'error');
+    }
+    setAddLoading(false);
+  };
+
+  const openEditModal = (client: ClientDTO) => {
+    setEditingClientId(client.id ?? null);
+    setCreateForm({ fullName: client.fullName || '', email: client.email || '', phone: client.phone || '', password: '', dni: (client as any).dni || '' });
+    setOpenEdit(true);
+    setAddError(null);
+  };
+
+  const closeEditModal = () => {
+    setOpenEdit(false);
+    setEditingClientId(null);
+  };
+
+  const handleUpdateClient = async () => {
+    if (!editingClientId) return;
+    // Validaciones (mismas que al crear)
+    const nameRegex = /^[A-Za-zÁÉÍÓÚáéíóúÑñ ]+$/;
+    const phoneRegex = /^\d+$/;
+    const dniRegex = /^\d+$/;
+    const emailRegex = /^\S+@\S+\.\S+$/;
+    if (!createForm.fullName || !nameRegex.test(createForm.fullName)) {
+      setAddError('El nombre debe ser solo letras y espacios');
+      return;
+    }
+    if (!createForm.phone || !phoneRegex.test(createForm.phone)) {
+      setAddError('El teléfono debe ser solo números');
+      return;
+    }
+    if (!createForm.dni || !dniRegex.test(createForm.dni)) {
+      setAddError('El DNI debe ser solo números');
+      return;
+    }
+    if (!createForm.email || !emailRegex.test(createForm.email)) {
+      setAddError('El email no es válido');
+      return;
+    }
+    setAddLoading(true);
+    setAddError(null);
+    try {
+    const body: ClientDTO = { id: editingClientId ?? undefined, fullName: createForm.fullName, dni: createForm.dni, email: createForm.email, phone: createForm.phone };
+    await updateClient(body as any);
+      closeEditModal();
+      go();
+      showSnackbar('Cliente actualizado correctamente', 'success');
+    } catch (e: any) {
+      const serverMsg = e?.response?.data?.message || e?.message;
+      setAddError(serverMsg || 'Error al actualizar cliente');
+      showSnackbar(serverMsg || 'Error al actualizar cliente', 'error');
     }
     setAddLoading(false);
   };
@@ -208,6 +294,83 @@ export default function ClientsPage() {
           </DialogActions>
         </Dialog>
 
+        {/* Delete confirmation dialog */}
+        <Dialog open={openDelete} onClose={()=>setOpenDelete(false)}>
+          <DialogTitle>Eliminar cliente de la organización</DialogTitle>
+          <DialogContent>
+            <Typography>¿Estás seguro que querés eliminar a {deleteTarget?.fullName} de la organización?</Typography>
+            {addError && <Alert severity="error" sx={{ mt:2 }}>{addError}</Alert>}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={()=>setOpenDelete(false)} disabled={addLoading}>Cancelar</Button>
+            <Button color="error" variant="contained" onClick={async ()=>{
+              if (!deleteTarget || !organizationId) return;
+              setAddLoading(true);
+              setAddError(null);
+              try {
+                await unlinkClientFromOrganization(deleteTarget.id as number, organizationId);
+                setOpenDelete(false);
+                setDeleteTarget(null);
+                go();
+                showSnackbar('Cliente eliminado de la organización', 'success');
+              } catch (e: any) {
+                const serverMsg = e?.response?.data?.message || e?.message;
+                setAddError(serverMsg || 'Error al eliminar cliente');
+                showSnackbar(serverMsg || 'Error al eliminar cliente', 'error');
+              }
+              setAddLoading(false);
+            }} disabled={addLoading}>Eliminar</Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Notify dialog */}
+        <Dialog open={openNotify} onClose={()=>setOpenNotify(false)} fullWidth maxWidth="sm">
+          <DialogTitle>Enviar notificación</DialogTitle>
+          <DialogContent>
+            <Typography sx={{ mb:1 }}>Enviar notificación a {notifyTarget?.fullName}</Typography>
+            <TextField label="Asunto" fullWidth value={notifySubject} onChange={e=>setNotifySubject(e.target.value)} sx={{ mb:2 }} />
+            <TextField fullWidth multiline minRows={3} value={notifyMessage} onChange={e=>setNotifyMessage(e.target.value)} placeholder="Mensaje de notificación" />
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={()=>setOpenNotify(false)}>Cancelar</Button>
+            <Button variant="contained" onClick={async ()=>{
+              if (!notifyTarget) return;
+              if (!notifySubject || notifySubject.trim().length===0) { showSnackbar('Ingrese un asunto', 'warning'); return; }
+              if (!notifyMessage || notifyMessage.trim().length===0) { showSnackbar('Ingrese un mensaje', 'warning'); return; }
+              if (!organizationId) { showSnackbar('No hay organización seleccionada', 'error'); return; }
+              try {
+                await notifyClient(notifyTarget.id as number, { language: 'ES', subject: notifySubject, message: notifyMessage, organizationId: organizationId });
+                setOpenNotify(false);
+                setNotifyTarget(null);
+                setNotifyMessage('');
+                setNotifySubject('');
+                showSnackbar('Notificación enviada', 'success');
+              } catch (e: any) {
+                const serverMsg = e?.response?.data?.message || e?.message;
+                showSnackbar(serverMsg || 'Error al enviar notificación', 'error');
+              }
+            }}>Enviar</Button>
+          </DialogActions>
+        </Dialog>
+        
+        {/* Edit dialog */}
+        <Dialog open={openEdit} onClose={closeEditModal} fullWidth maxWidth="sm">
+          <DialogTitle>Editar cliente</DialogTitle>
+          <DialogContent>
+            {addError && <Alert severity="error" sx={{ mb:2 }}>{addError}</Alert>}
+            <Box sx={{ display:'flex', flexDirection:'column', gap:1, mb:2 }}>
+              <TextField label="Nombre completo" value={createForm.fullName} onChange={e=>setCreateForm(f=>({...f, fullName:e.target.value}))} fullWidth autoComplete="off" inputProps={{ autoComplete: 'off' }} />
+              <TextField label="Email" value={createForm.email} onChange={e=>setCreateForm(f=>({...f, email:e.target.value}))} fullWidth autoComplete="off" inputProps={{ autoComplete: 'off' }} />
+              <TextField label="Teléfono" value={createForm.phone} onChange={e=>setCreateForm(f=>({...f, phone:e.target.value}))} fullWidth autoComplete="off" inputProps={{ autoComplete: 'off' }} />
+              <TextField label="DNI" value={createForm.dni} onChange={e=>setCreateForm(f=>({...f, dni:e.target.value}))} fullWidth autoComplete="off" inputProps={{ autoComplete: 'off' }} />
+            </Box>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={closeEditModal} disabled={addLoading}>Cancelar</Button>
+            <Button variant="contained" onClick={handleUpdateClient} disabled={addLoading}>Actualizar</Button>
+          </DialogActions>
+        </Dialog>
+
         {loading ? <CircularProgress/> : (
           <Table size="small">
             <TableHead>
@@ -216,6 +379,7 @@ export default function ClientsPage() {
                 <TableCell>Email</TableCell>
                 <TableCell>DNI</TableCell>
                 <TableCell>Teléfono</TableCell>
+                <TableCell align="center">Acciones</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -225,6 +389,17 @@ export default function ClientsPage() {
                   <TableCell>{r.email || '—'}</TableCell>
                   <TableCell>{(r as any).dni || '—'}</TableCell>
                   <TableCell>{r.phone || '—'}</TableCell>
+                  <TableCell align="center">
+                      <IconButton title="Enviar notificación" size="small" onClick={()=>{ setNotifyTarget(r); setNotifyMessage(''); setNotifySubject(''); setOpenNotify(true); }}>
+                        <NotificationsActiveIcon fontSize="small" />
+                      </IconButton>
+                      <IconButton title="Editar cliente" size="small" onClick={()=>{ openEditModal(r); }}>
+                        <EditIcon fontSize="small" />
+                      </IconButton>
+                      <IconButton title="Eliminar de organización" size="small" onClick={()=>{ setDeleteTarget(r); setOpenDelete(true); }}>
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
