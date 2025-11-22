@@ -22,6 +22,16 @@ export async function searchClients(params: { email?: string; phone?: string; na
   return data;
 }
 
+export async function findClientBy(params: { email?: string; phone?: string; dni?: string }) {
+  const { data } = await api.get('/clients/findBy', { params });
+  return data;
+}
+
+export async function linkClientToOrganization(clientId: number, organizationId: number) {
+  const { data } = await api.post(`/clients/${clientId}/${organizationId}`);
+  return data;
+}
+
 export async function createClient(body: ClientDTO) {
   const { data } = await api.post('/clients', body);
   return data;
