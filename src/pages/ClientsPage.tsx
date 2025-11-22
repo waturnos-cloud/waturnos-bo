@@ -2,19 +2,26 @@
 import { useEffect, useState } from 'react';
 import { Box, Button, Card, CardContent, CircularProgress, TextField, Typography, Table, TableBody, TableCell, TableHead, TableRow } from '@mui/material';
 import AppBarTop from '../components/AppBarTop';
-import { getClients, searchClients } from '../api/clients';
+import { getClientsByOrganization, searchClients } from '../api/clients';
+import { useAuth } from '../auth/AuthContext';
 import type { ClientDTO } from '../types/dto';
 
 export default function ClientsPage() {
+  const { organizationId } = useAuth();
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<ClientDTO[]>([]);
   const [q, setQ] = useState('');
 
   const go = async () => {
+    if (!organizationId) {
+      setRows([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     const resp = q
-      ? await searchClients({ name: q, email: q, phone: q })
-      : await getClients();
+      ? await searchClients({ name: q, email: q, phone: q, dni: q, organizationId })
+      : await getClientsByOrganization(organizationId);
     setRows(resp.data || []);
     setLoading(false);
   };
@@ -29,7 +36,7 @@ export default function ClientsPage() {
 
         <Card sx={{ mb:2 }}>
           <CardContent sx={{ display:'flex', gap:2 }}>
-            <TextField fullWidth placeholder="Buscar por nombre, email o teléfono" value={q} onChange={e=>setQ(e.target.value)} />
+              <TextField fullWidth placeholder="Buscar por nombre, email, teléfono o DNI" value={q} onChange={e=>setQ(e.target.value)} />
             <Button variant="contained" onClick={go}>Buscar</Button>
           </CardContent>
         </Card>
@@ -40,6 +47,7 @@ export default function ClientsPage() {
               <TableRow>
                 <TableCell>Nombre</TableCell>
                 <TableCell>Email</TableCell>
+                <TableCell>DNI</TableCell>
                 <TableCell>Teléfono</TableCell>
               </TableRow>
             </TableHead>
@@ -48,6 +56,7 @@ export default function ClientsPage() {
                 <TableRow key={r.id}>
                   <TableCell>{r.fullName}</TableCell>
                   <TableCell>{r.email || '—'}</TableCell>
+                  <TableCell>{(r as any).dni || '—'}</TableCell>
                   <TableCell>{r.phone || '—'}</TableCell>
                 </TableRow>
               ))}
