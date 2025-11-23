@@ -1,3 +1,7 @@
+export async function updateUser(body: any) {
+  const { data } = await api.put('/users', body);
+  return data;
+}
 import api from './axios';
 
 export async function getManagersByOrg(organizationId: number | string) {

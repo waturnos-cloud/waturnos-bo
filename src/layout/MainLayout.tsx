@@ -1,4 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import EditOrganizationModal from '../components/EditOrganizationModal';
+import EditAccountModal from '../components/EditAccountModal';
+import TopBar from '../components/TopBar';
 import {
   AppBar,
   Toolbar,
@@ -23,7 +26,6 @@ import {
   Dashboard as DashboardIcon,
   People as PeopleIcon,
   CalendarMonth as CalendarIcon,
-  Settings as SettingsIcon,
   Apartment as OrgIcon,
   Build as ServicesIcon,
   Person as UsersIcon,
@@ -37,9 +39,27 @@ const drawerWidthOpen = 240;
 const drawerWidthClosed = 72;
 
 export default function MainLayout() {
+  const [editOrgOpen, setEditOrgOpen] = useState(false);
+  const [editAccountOpen, setEditAccountOpen] = useState(false);
+  const organizationId = Number(localStorage.getItem('organizationId')) || 0;
+  const userId = Number(localStorage.getItem('userId')) || 0;
+  const { role } = useAuth();
+  // Obtener el tipo de organización desde localStorage ('simple' o 'multi')
+  const organizationType = localStorage.getItem('organizationType') || 'simple';
+
+  useEffect(() => {
+    const openEditOrg = () => setEditOrgOpen(true);
+    const openEditAccount = () => setEditAccountOpen(true);
+    window.addEventListener('openEditOrg', openEditOrg);
+    window.addEventListener('openEditAccount', openEditAccount);
+    return () => {
+      window.removeEventListener('openEditOrg', openEditOrg);
+      window.removeEventListener('openEditAccount', openEditAccount);
+    };
+  }, []);
   const [menuOpen, setMenuOpen] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { signOut, role } = useAuth();
+  const { signOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -60,7 +80,6 @@ export default function MainLayout() {
     { label: "Servicios", path: "/services", icon: <ServicesIcon />, roles: ["ADMIN", "MANAGER", "PROVIDER"], requiresOrg: true, requiresProvider: true },
     { label: "Usuarios", path: "/users", icon: <UsersIcon />, roles: ["ADMIN", "MANAGER"], requiresOrg: true, requiresProvider: true },
     { label: "Clientes", path: "/clients", icon: <PeopleIcon />, roles: ["ADMIN", "MANAGER", "PROVIDER"], requiresOrg: true, requiresProvider: true },
-    { label: "Configuración", path: "/settings", icon: <SettingsIcon />, roles: ["ADMIN", "MANAGER", "PROVIDER"], requiresOrg: true, requiresProvider: true },
   ];
 
   const visibleItems = menuItems.filter((item) => item.roles.includes(role ?? ""));
@@ -158,14 +177,7 @@ export default function MainLayout() {
         })}
       </List>
 
-      {/* 🔹 Info de rol */}
-      {menuOpen && (
-        <Box sx={{ p: 2 }}>
-          <Typography variant="caption" color="text.secondary">
-            Rol actual: <strong>{role || "N/A"}</strong>
-          </Typography>
-        </Box>
-      )}
+      {/* role info removed per request */}
     </>
   );
 
@@ -190,57 +202,8 @@ export default function MainLayout() {
       py: 1,
     }}
   >
-    {/* 🔹 Logo + organización */}
-    <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-      {!isDesktop && (
-        <IconButton color="inherit" edge="start" onClick={toggleMobileMenu}>
-          <MenuIcon />
-        </IconButton>
-      )}
-
-      <Box sx={{ display: "flex", flexDirection: "column", lineHeight: 1 }}>
-        <Typography
-          variant="h6"
-          sx={{ fontWeight: 700, letterSpacing: "0.5px" }}
-        >
-          WATurnos
-        </Typography>
-
-        {/* 🏢 Mostrar organización seleccionada */}
-        {localStorage.getItem("organizationName") && (
-          <Typography
-            variant="caption"
-            sx={{ opacity: 0.9 }}
-          >
-            {localStorage.getItem("organizationName")}
-
-            {localStorage.getItem("providerName")
-              ? ` — ${localStorage.getItem("providerName")}`
-              : ""}
-          </Typography>
-        )}
-      </Box>
-    </Box>
-
-    {/* 🔹 Botón Salir */}
-    <Button
-      color="inherit"
-      startIcon={<LogoutIcon />}
-      onClick={signOut}
-      sx={{
-        px: 2.5,
-        py: 0.8,
-        borderRadius: 2,
-        fontWeight: 600,
-        textTransform: "none",
-        backgroundColor: "rgba(255,255,255,0.18)",
-        "&:hover": {
-          backgroundColor: "rgba(255,255,255,0.28)",
-        },
-      }}
-    >
-      Salir
-    </Button>
+    {/* 🔹 TopBar con Avatar, rol y nombre de organización */}
+    <TopBar organizationName={localStorage.getItem("organizationName") || ""} />
   </Toolbar>
 </AppBar>
 
@@ -307,6 +270,10 @@ export default function MainLayout() {
           {menuOpen ? <ChevronLeftIcon fontSize="small" /> : <MenuIcon fontSize="small" />}
         </Fab>
       )}
+
+      {/* Modales de edición */}
+      <EditOrganizationModal open={editOrgOpen} onClose={()=>setEditOrgOpen(false)} organizationId={organizationId} onUpdated={()=>window.location.reload()} />
+      <EditAccountModal open={editAccountOpen} onClose={()=>setEditAccountOpen(false)} userId={userId} role={role || ""} onUpdated={()=>window.location.reload()} />
 
       {/* 🧭 Contenido principal */}
       <Box
